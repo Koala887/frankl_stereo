@@ -1,7 +1,7 @@
 
 VERSION=0.9.dev
 
-REFRESH=""
+REFRESH="X8664"
 
 ARCH=$(shell uname -m)
 
@@ -12,9 +12,11 @@ CFLAGS=-O2 -Wall -z execstack -D_FILE_OFFSET_BITS=64 -fgnu89-inline -DREFRESH$(R
 CFLAGSNO=-O0 -Wall -z execstack -D_FILE_OFFSET_BITS=64 -fgnu89-inline -DREFRESH$(REFRESH)
 
 # targets
-ALL: bin tmp bin/volrace bin/bufhrt bin/highrestest \
-     bin/writeloop bin/catloop bin/playhrt bin/cptoshm bin/shmcat \
-     bin/resample_soxr bin/cat64 bin/shownfinfo bin/music2nf
+#ALL: bin tmp bin/volrace bin/bufhrt bin/bufhrtmin bin/highrestest \
+#     bin/writeloop bin/catloop bin/playhrt bin/playhrtmin bin/playhrtbuschel bin/cptoshm bin/shmcat \
+#     bin/resample_soxr bin/cat64 bin/shownfinfo bin/music2nf
+ALL: bin tmp bin/bufhrt bin/bufhrtmin bin/highrestest \
+     bin/writeloop bin/catloop bin/playhrt bin/playhrtmin bin/playhrtbuschel
 
 bin:
 	mkdir -p bin
@@ -106,6 +108,15 @@ bin/myplayhrt: src/version.h tmp/net.o src/myplayhrt.c tmp/cprefresh.o tmp/cpref
 bin/by4: src/by4.c tmp/cprefresh.o tmp/cprefresh_ass.o |bin
 	$(CC) $(CFLAGSNO) -o bin/by4 src/by4.c tmp/cprefresh.o tmp/cprefresh_ass.o
 
+bin/playhrtmin: src/version.h tmp/net.o src/playhrtmin.c tmp/cprefresh.o tmp/cprefresh_ass.o |bin
+	$(CC) $(CFLAGSNO) -o bin/playhrtmin src/playhrtmin.c tmp/net.o tmp/cprefresh.o tmp/cprefresh_ass.o -lasound -lrt
+
+bin/playhrtbuschel: src/version.h tmp/net.o src/playhrtbuschel.c tmp/cprefresh.o tmp/cprefresh_ass.o |bin
+	$(CC) $(CFLAGSNO) -o bin/playhrtbuschel src/playhrtbuschel.c tmp/net.o tmp/cprefresh.o tmp/cprefresh_ass.o -lasound -lrt
+
+bin/bufhrtmin: src/version.h tmp/net.o src/bufhrtmin.c tmp/cprefresh.o tmp/cprefresh_ass.o |bin
+	$(CC) $(CFLAGSNO) -o bin/bufhrtmin tmp/net.o tmp/cprefresh.o tmp/cprefresh_ass.o src/bufhrtmin.c -lpthread -lrt
+
 clean: 
 	rm -rf src/version.h bin tmp
 
@@ -117,10 +128,10 @@ bin86:
 	make veryclean
 	make
 	cd bin; \
-	strip * ; \
-	tar cvf frankl_stereo-$(VERSION)-bin-$(ARCH).tar * ; \
-	gzip -9 frankl*.tar ; \
-	mv frankl*gz ..
+	strip *  
+#	tar cvf frankl_stereo-$(VERSION)-bin-$(ARCH).tar * ; \
+#	gzip -9 frankl*.tar ; \
+#	mv frankl*gz ..
 binPi: 
 	make veryclean
 	make REFRESH=VFP
