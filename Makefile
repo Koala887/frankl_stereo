@@ -127,8 +127,10 @@ veryclean: clean
 bin86: 
 	make veryclean
 	make
+	mkdir -p bin86 ; \
 	cd bin; \
-	strip *  
+	strip * ; \
+	cp * ../bin86  
 #	tar cvf frankl_stereo-$(VERSION)-bin-$(ARCH).tar * ; \
 #	gzip -9 frankl*.tar ; \
 #	mv frankl*gz ..

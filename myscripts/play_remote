@@ -1,0 +1,57 @@
+#!/bin/bash 
+
+#########################################################################
+##  frankl (C) 2015              play_remote
+##
+##  See README or http://frank_l.bitbucket.org/stereoutils/player.html
+##  for explanations.
+#########################################################################
+
+CARD="hw:0,0"
+EXTRABYTESBUF=0
+EXTRABYTESPLAY=0
+
+#VERBOSE="--verbose --verbose"
+AUDIOCOMPUTER=192.168.10.2
+SAMPLERATE=44100
+SAMPLEFORMAT=S32_LE
+# this is 192000 * 4 * 2 (32 bit samples, 2 channels)
+BYTESPERSECOND=352800
+BRUTEFIRCONFIG="<path to your brutefir config>"
+HOST=192.168.10.1
+PORT=5570
+
+# find input sample rate
+ORIGRATE=`sox --i "$1" | grep "Sample Rate" | cut -d: -f2 | sed -e "s/ //g"`
+echo ${ORIGRATE}
+ENDING=${1##*.}
+trap "trap - SIGTERM && kill -- -$$ " SIGINT SIGTERM EXIT
+
+cptoshm --file="$1" --shmname=/play.flac
+
+rm -f /dev/shm/bl{1,2,3} /dev/shm/sem.bl{1,2,3}* 
+
+shmcat --shmname=/play.flac |
+taskset -c 0 sox -t ${ENDING} - -t raw -r ${ORIGRATE} -c 2 -e signed -b 32 - | \
+taskset -c 0 writeloop --block-size=6720 --file-size=40320 --shared /bl1 /bl2 /bl3 &
+
+sleep 0.2
+
+# tell audio computer what to do, short sleep as startup time for sender
+REMOTE="sleep 0.3;\
+        taskset -c 3 chrt -f 95 playhrtmin --stripped ${VERBOSE} --host=${HOST} --port=${PORT} \
+                     --sample-rate=${SAMPLERATE} \
+                     --sample-format=${SAMPLEFORMAT} \
+                     --loops-per-second=1050 --number-copies=2 --slow-copies \
+                     --device=${CARD} --hw-buffer=1920 \
+                     --extra-bytes-per-second=${EXTRABYTESPLAY} \
+                     --non-blocking-write --mmap" #--in-net-buffer-size=67200"
+
+echo "${REMOTE}" |  nc -q 0 ${AUDIOCOMPUTER} 5501 
+
+# instead of
+taskset -c 1 catloop --block-size=6720 --shared /bl1 /bl2 /bl3 | \
+taskset -c 1 chrt -f 95 bufhrt --bytes-per-second=${BYTESPERSECOND} \
+       --loops-per-second=1050 --port-to-write=${PORT} \
+       --extra-bytes-per-second=${EXTRABYTESBUF} \
+       ${VERBOSE} #--out-net-buffer-size=67200

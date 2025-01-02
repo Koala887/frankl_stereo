@@ -1,0 +1,57 @@
+#!/bin/bash 
+
+#########################################################################
+##  frankl (C) 2015              play_remote2
+##
+##  See README or http://frank_l.bitbucket.org/stereoutils/player.html
+##  for explanations.
+#########################################################################
+
+CARD="hw:0,0"
+EXTRABYTESBUF=12
+EXTRABYTESPLAY=0
+
+VERBOSE="--verbose --verbose"
+AUDIOCOMPUTER=192.168.10.2
+SAMPLERATE=44100
+SAMPLEFORMAT=S32_LE
+# this is 192000 * 4 * 2 (32 bit samples, 2 channels)
+BYTESPERSECOND=352800
+BRUTEFIRCONFIG="<path to your brutefir config>"
+HOST=192.168.10.1
+PORT=5570
+
+# find input sample rate
+#ORIGRATE=`sox --i "$1" | grep "Sample Rate" | cut -d: -f2 | sed -e "s/ //g"`
+
+trap "trap - SIGTERM && kill -- -$$ " SIGINT SIGTERM EXIT
+
+#cptoshm --file="$1" --shmname=/play.flac
+
+rm -f /dev/shm/bl{1,2,3} /dev/shm/sem.bl{1,2,3}* 
+
+#shmcat --shmname=/play.flac |
+taskset -c 2 sox "$1" -t raw -r ${SAMPLERATE} -c 2 -e signed -b 32 - | \
+taskset -c 2 writeloop --block-size=6720 --file-size=40320 --shared /bl1 /bl2 /bl3 &
+
+sleep 0.2
+
+# tell audio computer what to do, short sleep as startup time for sender
+REMOTE="sleep 0.3;\
+        taskset -c 3 playhrtbuschel ${VERBOSE} --host=${HOST} --port=${PORT} \
+                     --rate=${SAMPLERATE} \
+                     --format=${SAMPLEFORMAT} \
+                     --loops-per-second=1050 \
+                     --device=${CARD} --hw-buffer-size=7680 \
+                     --non-blocking-write --mmap "
+
+echo "${REMOTE}" |  nc -q 0 ${AUDIOCOMPUTER} 5501 
+
+
+taskset -c 3 catloop --block-size=6720 --shared /bl1 /bl2 /bl3 | \
+taskset -c 3 bufhrtmin --bytes-per-second=${BYTESPERSECOND} \
+       --loops-per-second=1050 --port-to-write=${PORT} \
+       --extra-bytes-per-second=${EXTRABYTESBUF} \
+       ${VERBOSE} #\
+       #--shared /bl1 /bl2 /bl3 
+
