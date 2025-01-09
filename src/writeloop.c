@@ -86,6 +86,11 @@ void usage( ) {
 "      if input is a file then skip intval bytes at the beginning, the \n"
 "      argument is rounded down to a multiple of 8.\n"
 "\n"
+"  --number-copies=intnum, -R intnum\n"
+"      before writing data they are copied the specfied number of\n"
+"      times through  cleaned temporary buffers in RAM.\n"
+"      The default is 0. \n"
+"\n"
 "  --verbose, -v\n"
 "      print some information during startup.\n"
 "\n"
@@ -133,10 +138,10 @@ int main(int argc, char *argv[])
     char **fname, *fnames[100], **tmpname, *tmpnames[100], **mem, *mems[100],
          *ptr, *nfinfo;
     sem_t **sem, *sems[100], **semw, *semsw[100];
-    void * buf;
+    void *buf, *tbufs[1024];
     long nfid;
     int outfile, fd[100], inp, i, shared, verbose, force, blocksize,
-        semflag, size, ret, sz, c, optc;
+        semflag, size, ret, sz, c, optc, nrcp;
     off_t skip, checkskip;
     struct nfrec *nfr;
 
@@ -150,6 +155,7 @@ int main(int argc, char *argv[])
         {"force-shm", no_argument, 0, 'x' },
         {"nfinfo", required_argument, 0, 'M' },
         {"nfid", required_argument, 0, 'N' },
+        {"number-copies", required_argument, 0, 'R' },
         {"verbose", no_argument, 0, 'v' },
         {"version", no_argument, 0, 'V' },
         {"help", no_argument, 0, 'h' },
@@ -171,7 +177,9 @@ int main(int argc, char *argv[])
     nfid = -2;
     inp = 0;  /* stdin */
     skip = 0;
-    while ((optc = getopt_long(argc, argv, "b:f:F:M:N:sVh",
+    nrcp = 0;
+    buf = NULL;
+    while ((optc = getopt_long(argc, argv, "b:f:F:M:N:R:sVh",
             longoptions, &optind)) != -1) {
         switch (optc) {
         case 'b':
@@ -205,6 +213,10 @@ int main(int argc, char *argv[])
         case 'N':
           nfid = atoi(optarg);
           break;
+        case 'R':
+          nrcp = atoi(optarg);
+          if (nrcp < 0 || nrcp > 1000) nrcp = 0;
+          break;
         case 'v':
           verbose = 1;
           break;
@@ -229,7 +241,7 @@ int main(int argc, char *argv[])
         fprintf(stderr, "writeloop: Block size must be smaller than file size.\n");
         exit(3);
     }
-    buf = malloc(blocksize);
+    posix_memalign(&buf, 4096, blocksize);
     if (! buf) {
        fprintf(stderr, "writeloop: Cannot allocate buffer.\n");
        exit(4);
@@ -243,6 +255,15 @@ int main(int argc, char *argv[])
           semflag = O_CREAT;
        else
           semflag = O_CREAT | O_EXCL;
+    }
+    if (nrcp && nfinfo == NULL) {
+        /* temporary buffers */
+        for (i=1; i < nrcp; i++) {
+            if (posix_memalign(tbufs+i, 4096, blocksize)) {
+                fprintf(stderr, "writeloop: Cannot allocate buffer for cleaning.\n");
+                exit(2);
+            }
+        }
     }
 
     for (i=optind; i < argc; i++) {
@@ -284,7 +305,7 @@ int main(int argc, char *argv[])
            unlink(fnames[i-optind]);
 
        tmpnames[i-optind] = (char*)malloc(strlen(argv[i])+5);
-       strncpy(tmpnames[i-optind], fnames[i-optind], strlen(argv[i]));
+       strncpy(tmpnames[i-optind], fnames[i-optind], strlen(argv[i])+5);
        strncat(tmpnames[i-optind], ".TMP", 5);
        if (shared) {
            /* open semaphore with TMP name for write lock */
@@ -323,16 +344,23 @@ int main(int argc, char *argv[])
         }
         size = PS;
         blocksize = PS;
-        free(buf);
-        buf = malloc(2*PS);
-        while (((unsigned long)buf) % PS !=0) buf++;
+        posix_memalign(&buf, 4096, blocksize);
+        if (nrcp) {
+            /* temporary buffers */
+            for (i=1; i < nrcp; i++) {
+                if (posix_memalign(tbufs+i, 4096, blocksize)) {
+                    fprintf(stderr, "writeloop: Cannot allocate buffer for cleaning.\n");
+                    exit(2);
+                }
+            }
+        }
         sz = (skip/PS)*PS;
         mem = mems;
         sem = sems;
         semw = semsw;
         memclean(buf, blocksize);
         c = nfreadpage(buf);
-        refreshmem((char*)buf, blocksize);
+        //refreshmem((char*)buf, blocksize);
         sz += c;
         while (c > 0) {
            if (*fname == NULL) {
@@ -346,8 +374,17 @@ int main(int argc, char *argv[])
            sem_wait(*semw);
            ptr = *mem+sizeof(long);
            memclean(ptr, size);
-           memcpy(ptr, buf, c);
-           refreshmem((char*)ptr, size);
+           cprefresh(ptr, buf, c);
+           if (nrcp) {
+               tbufs[0] = ptr;
+               tbufs[nrcp] = ptr;
+               for (i=1; i <= nrcp; i++) {
+                   memclean((char*)(tbufs[i]), c);
+                   cprefresh((char*)(tbufs[i]), (char*)(tbufs[i-1]), c);
+                   memclean((char*)(tbufs[i-1]), c);
+               }
+           }
+
            *((long*)(*mem)) = (long)c;
            sem_post(*sem);
 
@@ -401,9 +438,18 @@ int main(int argc, char *argv[])
               exit(0);
            }
            ptr = *mem+sizeof(long);
-           memclean(ptr, size);
            while (c > 0 && sz <= size) {
-              memcpy(ptr, buf, c);
+              memclean(ptr, c);
+              cprefresh(ptr, buf, c);
+              if (nrcp) {
+                  tbufs[0] = ptr;
+                  tbufs[nrcp] = ptr;
+                  for (i=1; i <= nrcp; i++) {
+                      memclean((char*)(tbufs[i]), c);
+                      cprefresh((char*)(tbufs[i]), (char*)(tbufs[i-1]), c);
+                      memclean((char*)(tbufs[i-1]), c);
+                  }
+              }
               ptr += c;
               memclean(buf, blocksize);
               c = read(inp, buf, blocksize);

@@ -25,6 +25,8 @@ http://www.gnu.org/licenses/gpl.txt for license details.
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <semaphore.h>
+#include <linux/prctl.h>
+#include <sys/prctl.h>
 #include "cprefresh.h"
 
 #define TBUF 134217728 /* 2^27 */
@@ -173,6 +175,13 @@ void usage( ) {
 "      the program is running can be checked with 'netstat -tpn'.\n"
 "      Usually the operation system chooses sensible values itself.\n"
 "\n"
+"  --shift=intval, -x intval\n"
+"      sleeping to some specific time has limited precision (depending\n"
+"      on many parameters). This paramter appends a loop after each sleep\n"
+"      which runs until the given wakeup time plus intval ns. This can make\n"
+"      the intervals between writes more precise.\n"
+"      Default is 0, so no extra loops.\n"
+"\n"
 "  --verbose, -v\n"
 "      print some information during startup and operation.\n"
 "\n"
@@ -221,6 +230,23 @@ void usage( ) {
   );
 }
 
+inline long difftimens(struct timespec t1, struct timespec t2)
+{ 
+   long long l1, l2;
+   l1 = t1.tv_sec*1000000000 + t1.tv_nsec;
+   l2 = t2.tv_sec*1000000000 + t2.tv_nsec;
+   return (long)(l2-l1);
+}
+
+/* after calibration nsloop will take cnt ns */
+double nsloopfactor = 1.0;
+
+static inline long  nsloop(long cnt) {
+  long i, j;
+  for (j = 1, i = (long)(cnt*nsloopfactor); i > 0; i--) j = j+i;
+  return j;
+}
+
 int main(int argc, char *argv[])
 {
     struct sockaddr_in serv_addr;
@@ -230,12 +256,12 @@ int main(int argc, char *argv[])
     long blen, hlen, ilen, olen, outpersec, loopspersec, nsec, count, wnext,
          badreads, badreadbytes, badwrites, badwritebytes, lcount, 
          dcount, dsyncfreq, fsize, e, a, outtime, outcopies, rambps, ramlps, 
-         ramtime, ramchunk;
+         ramtime, ramchunk, shift;
     long long icount, ocount;
     void *buf, *iptr, *optr, *max;
     char *port, *inhost, *inport, *outfile, *infile, *ptmp, *tbuf;
     void *obufs[1024];
-    struct timespec mtime, mtime1, otime;
+    struct timespec mtime, mtime1, ttime;
     double looperr, extraerr, extrabps, off, dsyncpersec;
     /* variables for shared memory input */
     char **fname, *fnames[100], **tmpname, *tmpnames[100], **mem, *mems[100],
@@ -261,6 +287,7 @@ int main(int argc, char *argv[])
         {"sample-format", required_argument, 0, 'f' },
         {"dsync", no_argument, 0, 'd' },
         {"file", required_argument, 0, 'F' },
+        {"shift", required_argument, 0, 'x' },
         {"number-copies", required_argument, 0, 'R' },
         {"out-copies", required_argument, 0, 'c' },
         {"host-to-read", required_argument, 0, 'H' },
@@ -312,8 +339,9 @@ int main(int argc, char *argv[])
     nrcp = 0;
     innetbufsize = 0;
     outnetbufsize = 0;
+    shift = 0;
     verbose = 0;
-    while ((optc = getopt_long(argc, argv, "p:o:b:i:D:n:m:X:Y:s:f:F:R:c:H:P:e:vVhd",
+    while ((optc = getopt_long(argc, argv, "p:o:b:i:D:n:m:X:Y:s:f:F:R:c:H:P:e:x:vVIhd",
             longoptions, &optind)) != -1) {
         switch (optc) {
         case 'p':
@@ -398,6 +426,8 @@ int main(int argc, char *argv[])
           if (outnetbufsize != 0 && outnetbufsize < 128)
               outnetbufsize = 128;
           break;
+        case 'x':
+          shift = atoi(optarg);
         case 'O':
           break;   /* ignored */
         case 'I':
@@ -486,6 +516,15 @@ int main(int argc, char *argv[])
           fprintf(stderr, "Data sync'ed every %ld loops.\n", dsyncfreq);
     }
 
+    /* avoid waiting 50000 ns collecting more sleep requests */
+    prctl(PR_SET_TIMERSLACK, 1L);
+
+    /* calibrate sleep loop */
+    clock_gettime(CLOCK_MONOTONIC, &mtime);
+    nsloop(10000000);
+    clock_gettime(CLOCK_MONOTONIC, &ttime);
+    nsloopfactor = 1.0*10000000/(difftimens(mtime, ttime)-50);
+
     extraerr = 1.0*outpersec/(outpersec+extrabps);
     nsec = (int) (1000000000*extraerr/loopspersec);
     olen = outpersec/loopspersec;
@@ -532,7 +571,7 @@ int main(int argc, char *argv[])
     /* buffers for loop of output copies */
     if (outcopies > 0) {
         /* spend half of loop duration with copies of output chunk */
-        outtime = nsec/(2*outcopies);
+        outtime = nsec/(8*outcopies);
         for (i=1; i < outcopies; i++) {
             if (posix_memalign(obufs+i, 4096, 2*olen)) {
                 fprintf(stderr, "bufhrt: Cannot allocate buffer for output cleaning.\n");
@@ -768,6 +807,8 @@ int main(int argc, char *argv[])
                        }
                        while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME,
                                                        &mtime, NULL) != 0) ;
+                       clock_gettime(CLOCK_MONOTONIC, &ttime);
+                       nsloop(shift - difftimens(mtime, ttime));
                        memclean(tbuf, e-a);
                        cprefresh(tbuf, buf+a, e-a);
                        mtime.tv_nsec += ramtime;
@@ -777,6 +818,8 @@ int main(int argc, char *argv[])
                        }
                        while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME,
                                                        &mtime, NULL) != 0) ;
+                       clock_gettime(CLOCK_MONOTONIC, &ttime);
+                       nsloop(shift - difftimens(mtime, ttime));
                        memclean(buf+a, e-a);
                        cprefresh(buf+a, tbuf, e-a);
                    }
@@ -826,16 +869,8 @@ int main(int argc, char *argv[])
               if (outcopies > 0) {
                   obufs[0] = optr;
                   obufs[outcopies] = optr;
-                  otime.tv_nsec = mtime.tv_nsec;
-                  otime.tv_sec = mtime.tv_sec;
                   for (k=1; k <= outcopies; k++) {
-                      otime.tv_nsec += outtime;
-                      if (otime.tv_nsec > 999999999) {
-                        otime.tv_nsec -= 1000000000;
-                        otime.tv_sec++;
-                      }
-                      clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, 
-                                                                 &otime, NULL);
+                      nsloop(outtime);
                       memclean((char*)(obufs[k]), wnext);
                       cprefresh((char*)(obufs[k]), (char*)(obufs[k-1]), wnext);
                       memclean((char*)(obufs[k-1]), wnext);
@@ -846,6 +881,9 @@ int main(int argc, char *argv[])
               while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME,
                                                                  &mtime, NULL)
                      != 0) ;
+              /* write at mtime + shift ns */
+              clock_gettime(CLOCK_MONOTONIC, &ttime);
+              nsloop(shift - difftimens(mtime, ttime));
               /* write a chunk, this comes first after waking from sleep */
               s = write(connfd, optr, wnext);
               if (s < 0) {

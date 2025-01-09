@@ -24,6 +24,8 @@ http://www.gnu.org/licenses/gpl.txt for license details.
 #include <sys/stat.h>        /* For mode constants */
 #include <fcntl.h>           /* For O_* constants */
 #include <semaphore.h>
+#include <linux/prctl.h>
+#include <sys/prctl.h>
 #include "cprefresh.h"
 
 /* help page */
@@ -282,16 +284,58 @@ void usage( ) {
 );
 }
 
+/* utility function to print some statistics about timing */
+/* some code is now in comment after we found a good value for 'shift' on
+   C4, search for 'sstat' */
+#define SSTATLEN 22500
+int printsstat(long* sstat) {
+    long i, max, min;
+    FILE *out;
+    max = sstat[0];
+    min = max;
+    for (i=1; i<SSTATLEN; i++) {
+         if (sstat[i] < min)
+             min = sstat[i];
+         if (sstat[i] > max)
+             max = sstat[i];
+    }
+    out = fopen("/cache/sstat.g", "w");
+    fprintf(out, "\n# delay statistics min = %ld max = %ld \n# First values:\n\nd := [", min, max);
+    for (i=0; i<SSTATLEN; i++) 
+         fprintf(out, "%ld, ", sstat[i]);
+    fprintf(out, "];\n\n"); 
+    fclose(out);
+    return 0;
+}
+
+/* difference t2 - t1 in ns */
+inline long difftimens(struct timespec t1, struct timespec t2)
+{ 
+   long long l1, l2;
+   l1 = t1.tv_sec*1000000000 + t1.tv_nsec;
+   l2 = t2.tv_sec*1000000000 + t2.tv_nsec;
+   return (long)(l2-l1);
+}
+
+/* after calibration nsloop will take cnt ns */
+double nsloopfactor = 1.0;
+
+static inline long  nsloop(long cnt) {
+  long i, j;
+  for (j = 1, i = (long)(cnt*nsloopfactor); i > 0; i--) j = j+i;
+  return j;
+}
 
 int main(int argc, char *argv[])
 {
     int sfd, verbose, nrchannels, startcount,
         stripped, innetbufsize, nrcp, slowcp, k;
-    long blen, ilen, olen, extra, loopspersec, nrdelays, sleep,
+    long blen, ilen, olen, extra, loopspersec, nrdelays, sleep, shift,
          nsec, csec, count, badloops, badreads, readmissing, avgav, checkav;
+    long *sstat;
     long long icount, ocount, badframes;
     void *buf, *iptr, *tbuf, *tbufs[1024];
-    struct timespec mtime, ctime;
+    struct timespec mtime, ctime, ttime;
     double looperr, extraerr, extrabps, morebps;
     snd_pcm_t *pcm_handle;
     snd_pcm_hw_params_t *hwparams;
@@ -310,6 +354,7 @@ int main(int argc, char *argv[])
          *ptr;
     sem_t **sem, *sems[100], **semw, *semsw[100];
     int shared, fd[100], i, flen, size, sz;
+    // int sstatcount;
     struct stat sb;
 
     /* read command line options */
@@ -379,6 +424,12 @@ int main(int argc, char *argv[])
     corr = 0;
     verbose = 0;
     stripped = 0;
+    sstat = NULL;
+    shift = 95000;
+    sstat = NULL;
+    /* use to enable statistics to find good shift parameter 
+    sstatcount = 0;
+    sstat = malloc(SSTATLEN*sizeof(long)); */
     while ((optc = getopt_long(argc, argv, "r:p:Sb:D:i:n:s:f:k:Mc:P:d:R:Ce:m:K:o:NFXO:vyjVh",
             longoptions, &optind)) != -1) {
         switch (optc) {
@@ -500,7 +551,7 @@ int main(int argc, char *argv[])
     extraerr = 1.0*bytesperframe*rate;
     extraerr = extraerr/(extraerr+extrabps);
     nsec = (int) (1000000000*extraerr/loopspersec);
-    if (slowcp) csec = nsec / (4*nrcp);
+    if (slowcp) csec = nsec / (8*nrcp);
     if (verbose) {
         fprintf(stderr, "playhrt: Step size is %ld nsec.\n", nsec);
     }
@@ -652,6 +703,9 @@ int main(int argc, char *argv[])
     }
     snd_pcm_sw_params_free (swparams);
 
+    /* avoid waiting 50000 ns collecting more sleep requests */
+    prctl(PR_SET_TIMERSLACK, 1L);
+
     /* shared memory input */
     if (shared) {
       size = 0;
@@ -729,7 +783,16 @@ int main(int argc, char *argv[])
      if (clock_gettime(CLOCK_MONOTONIC, &mtime) < 0) {
           exit(19);
       }
+
+      /* calibrate sleep loop */
+      clock_gettime(CLOCK_MONOTONIC, &mtime);
+      nsloop(10000000);
+      clock_gettime(CLOCK_MONOTONIC, &ctime);
+      nsloopfactor = 1.0*10000000/(difftimens(mtime, ctime)-50);
+
       count = 1;
+      /* set start time (- nsec) */
+      clock_gettime(CLOCK_MONOTONIC, &mtime);
       while (1) {
           /* prepare shared memory file */
          if (*fname == NULL) {
@@ -754,6 +817,7 @@ int main(int argc, char *argv[])
                   fname++;
                   tmpname++;
               }
+              if (sstat) printsstat(sstat);
               exit(0);
           }
           /* write shared memory content hardware buffer  */
@@ -766,13 +830,10 @@ int main(int argc, char *argv[])
              if (count == startcount)  snd_pcm_start(pcm_handle);
 
              frames = olen;
-             //avail = snd_pcm_avail(pcm_handle);
              snd_pcm_avail(pcm_handle);
              snd_pcm_mmap_begin(pcm_handle, &areas, &offset, &frames);
              ilen = frames * bytesperframe;
              iptr = areas[0].addr + offset * bytesperframe;
-             /* memclean((char*)iptr, ilen);
-             memcpy((void*)iptr, (void*)ptr, ilen); */
              memclean((char*)iptr, ilen);
              cprefresh((char*)iptr, (char*)ptr, ilen);
              sz += ilen;
@@ -780,21 +841,15 @@ int main(int argc, char *argv[])
              if (slowcp) {
                  tbufs[0] = iptr;
                  tbufs[nrcp] = iptr;
-                 ctime.tv_nsec = mtime.tv_nsec;
-                 ctime.tv_sec = mtime.tv_sec;
                  for (k=1; k <= nrcp; k++) {
-                     ctime.tv_nsec += csec;
-                     if (ctime.tv_nsec > 999999999) {
-                       ctime.tv_nsec -= 1000000000;
-                       ctime.tv_sec++;
-                     }
-                     clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &ctime, NULL);
+                     /* short active pause before before cprefresh
+                        (too short for sleeps) */
+                     nsloop(csec);
                      memclean((char*)(tbufs[k]), ilen);
                      cprefresh((char*)(tbufs[k]), (char*)(tbufs[k-1]), ilen);
                      memclean((char*)(tbufs[k-1]), ilen);
                  }
              } else {
-                 /*refreshmem(iptr, ilen); */
                  for (k=nrcp; k; k--) {
                      memclean((char*)tbuf, ilen);
                      cprefresh((char*)tbuf, (char*)iptr, ilen);
@@ -808,6 +863,17 @@ int main(int argc, char *argv[])
                mtime.tv_sec++;
              }
              clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &mtime, NULL);
+             /* the end of sleep is not too precise, we add an active loop
+                to delay the commit to mtime + shift ns */
+             clock_gettime(CLOCK_MONOTONIC, &ttime);
+             /* some statistics code to find the differences between mtime
+                and the time measured after sleep;
+                use about the maximum as 'shift' parameter 
+             if (sstat && sstatcount < SSTATLEN) {
+                 sstat[sstatcount] = difftimens(mtime, ttime);
+                 sstatcount++;
+             }  */
+             nsloop(shift-difftimens(mtime, ttime));
              snd_pcm_mmap_commit(pcm_handle, offset, frames);
              count++;
           }
@@ -839,6 +905,7 @@ int main(int argc, char *argv[])
                         "playhrt: Bad loops/frames written: %ld/%lld,  bad reads/bytes: %ld/%ld.\n",
                     count, nrdelays, icount, ocount, badloops, badframes, badreads, readmissing);
     }
+    if (sstat) printsstat(sstat);
     return 0;
 }
 

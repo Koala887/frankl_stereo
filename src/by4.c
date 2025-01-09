@@ -14,44 +14,47 @@
 
 int main(int argc, char *argv[])
 {
-   double inp[1024], *ip;
-   int32_t out[256], tout[256], *op;
-   int i, mlen, nrcp;
-   struct timespec mtime;
+    double inp[1024], *ip;
+    int32_t out[256], *op;
+    int i, mlen, nrcp;
+    void *tbufs[1024];
 
-   nrcp = 0;
-   if (argc == 2) {
-       nrcp = atoi(argv[1]);
-       if (nrcp < 0 || nrcp > 5000)
-           nrcp = 0;
-   }
-   if (clock_gettime(CLOCK_MONOTONIC, &mtime) < 0) {
-        exit(1);
-   }
+    nrcp = 0;
+    if (argc == 2) {
+        nrcp = atoi(argv[1]);
+        if (nrcp < 0 || nrcp > 5000)
+            nrcp = 0;
+    }
+    if (nrcp) {
+        /* temporary buffers */
+        for (i=1; i < nrcp; i++) {
+            if (posix_memalign(tbufs+i, 4096, 4096)) {
+                fprintf(stderr, "cptoshm: Cannot allocate buffer for cleaning.\n");
+                exit(2);
+            }
+        }
+    }
+    tbufs[0] = out;
+    tbufs[nrcp] = out;
 
-   while (1) {
-      memclean((char*)inp, 8192);  
-      mlen = fread((void*)inp, sizeof(double), 1024, stdin);
-      if (mlen == 0) break;
-      memclean((char*)out, 1024);
-      for (i=mlen/8, ip=inp, op=out; i; ip+=8, op+=2, i--) {
-        *op = (int32_t) (*ip * 2147483647);
-        *(op+1) = (int32_t) (*(ip+1) * 2147483647);
-      }
-      clock_gettime(CLOCK_MONOTONIC, &mtime);
-      for(i=nrcp; i; i--) {
-          mtime.tv_nsec += 150000;
-          if (mtime.tv_nsec > 999999999) {
-            mtime.tv_nsec -= 1000000000;
-            mtime.tv_sec++;
-          }
-          memclean((char*)tout, mlen);
-          cprefresh((char*)tout, (char*)out, mlen);
-          clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &mtime, NULL);
-          memclean((char*)out, mlen);
-          cprefresh((char*)out, (char*)tout, mlen);
-      }
-      fwrite((void*)out, sizeof(int32_t), mlen/4, stdout);
-   }
-   return 0;
+
+    while (1) {
+       memclean((char*)inp, 8192);  
+       mlen = fread((void*)inp, sizeof(double), 1024, stdin);
+       if (mlen == 0) break;
+       memclean((char*)out, 1024);
+       for (i=mlen/8, ip=inp, op=out; i; ip+=8, op+=2, i--) {
+         *op = (int32_t) (*ip * 2147483647);
+         *(op+1) = (int32_t) (*(ip+1) * 2147483647);
+       }
+       if (nrcp) {
+           for (i=1; i <= nrcp; i++) {
+               memclean((char*)(tbufs[i]), mlen);
+               cprefresh((char*)(tbufs[i]), (char*)(tbufs[i-1]), mlen);
+               memclean((char*)(tbufs[i-1]), mlen);
+           }
+       }
+       fwrite((void*)out, sizeof(int32_t), mlen/4, stdout);
+    }
+    return 0;
 }
