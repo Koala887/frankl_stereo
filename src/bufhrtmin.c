@@ -25,6 +25,8 @@ http://www.gnu.org/licenses/gpl.txt for license details.
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <semaphore.h>
+#include <linux/prctl.h>
+#include <sys/prctl.h>
 #include "cprefresh.h"
 
 #define TBUF 134217728 /* 2^27 */
@@ -38,6 +40,21 @@ void usage( ) {
   fprintf(stderr,
           "bufhrt (version %s of frankl's stereo utilities)\nUSAGE:\n",
           VERSION);
+inline long difftimens(struct timespec t1, struct timespec t2)
+{ 
+   long long l1, l2;
+   l1 = t1.tv_sec*1000000000 + t1.tv_nsec;
+   l2 = t2.tv_sec*1000000000 + t2.tv_nsec;
+   return (long)(l2-l1);
+}
+
+/* after calibration nsloop will take cnt ns */
+double nsloopfactor = 1.0;
+
+static inline long  nsloop(long cnt) {
+  long i, j;
+  for (j = 1, i = (long)(cnt*nsloopfactor); i > 0; i--) j = j+i;
+  return j;
 }
 
 int main(int argc, char *argv[])
@@ -49,12 +66,12 @@ int main(int argc, char *argv[])
     long blen, hlen, ilen, olen, outpersec, loopspersec, nsec, count, wnext,
          badreads, badreadbytes, badwrites, badwritebytes, lcount, 
          dcount, dsyncfreq, fsize, e, a, outtime, outcopies, rambps, ramlps, 
-         ramtime, ramchunk;
+         ramtime, ramchunk, shift;
     long long icount, ocount;
     void *buf, *iptr, *optr, *max;
     char *port, *inhost, *inport, *outfile, *infile, *ptmp, *tbuf;
     void *obufs[1024];
-    struct timespec mtime, mtime1, otime;
+    struct timespec mtime, mtime1, ttime;
     double looperr, extraerr, extrabps, off, dsyncpersec;
     /* variables for shared memory input */
     char **fname, *fnames[100], **tmpname, *tmpnames[100], **mem, *mems[100],
@@ -80,6 +97,7 @@ int main(int argc, char *argv[])
         {"sample-format", required_argument, 0, 'f' },
         {"dsync", no_argument, 0, 'd' },
         {"file", required_argument, 0, 'F' },
+        {"shift", required_argument, 0, 'x' },
         {"number-copies", required_argument, 0, 'R' },
         {"out-copies", required_argument, 0, 'c' },
         {"host-to-read", required_argument, 0, 'H' },
@@ -131,16 +149,19 @@ int main(int argc, char *argv[])
     nrcp = 0;
     innetbufsize = 0;
     outnetbufsize = 0;
+    shift = 0;
     verbose = 0;
-    while ((optc = getopt_long(argc, argv, "p:o:b:i:D:n:m:X:Y:s:f:F:R:c:H:P:e:vVhd",
+    while ((optc = getopt_long(argc, argv, "p:o:b:i:D:n:m:X:Y:s:f:F:R:c:H:P:e:x:vVIhd",
             longoptions, &optind)) != -1) {
         switch (optc) {
         case 'p':
           port = optarg;
           break;
         case 'd':
+          dsync = 1;
           break;
         case 'o':
+          outfile = optarg;
           break;
         case 'b':
           blen = atoi(optarg);
@@ -181,11 +202,11 @@ int main(int argc, char *argv[])
           } else if (strcmp(optarg, "S32_LE")==0) {
              bytesperframe = 8;
           } else {
-             fprintf(stderr, "bufhrt: Sample format %s not recognized.\n", optarg);
              exit(1);
           }
           break;
         case 'F':
+          infile = optarg;
           break;
         case 'H':
           inhost = optarg;
@@ -203,6 +224,7 @@ int main(int argc, char *argv[])
           extrabps = atof(optarg);
           break;
         case 'D':
+          dsyncpersec = atof(optarg);
         case 'K':
           innetbufsize = atoi(optarg);
           if (innetbufsize != 0 && innetbufsize < 128)
@@ -213,6 +235,8 @@ int main(int argc, char *argv[])
           if (outnetbufsize != 0 && outnetbufsize < 128)
               outnetbufsize = 128;
           break;
+        case 'x':
+          shift = atoi(optarg);
         case 'O':
           break;   /* ignored */
         case 'I':
@@ -231,24 +255,35 @@ int main(int argc, char *argv[])
           exit(3);
         }
     }
-
+    /* check some arguments, open files and set some parameters */
+    if (outfile) {
+        connfd = open(outfile, O_WRONLY | O_CREAT | O_NOATIME, 00644);
+        if (connfd == -1) {
+            exit(3);
+        }
+    }
     if (infile) {
         if ((ifd = open(infile, O_RDONLY | O_NOATIME)) == -1) {
-            fprintf(stderr, "bufhrt: Cannot open input file %s: %s.\n", 
-                            infile, strerror(errno));
             exit(2);
         }
     }
+    /* translate --dsync */
+    if (dsync) dsyncfreq = 1;
+    if (dsyncpersec) dsyncfreq = (long) (loopspersec/dsyncpersec);
     if (outpersec == 0) {
        if (rate != 0 && bytesperframe != 0) {
            outpersec = rate * bytesperframe;
        } else {
-           fprintf(stderr, "bufhrt: Specify --bytes-per-second (or rate and "
-                           "format of audio data).\n");
            exit(5);
        }
     }
-
+    if (inhost != NULL && inport != NULL) {
+       ifd = fd_net(inhost, inport);
+        if (innetbufsize != 0  &&
+            setsockopt(ifd, SOL_SOCKET, SO_RCVBUF, (void*)&innetbufsize, sizeof(int)) < 0) {
+                exit(23);
+        }
+    }
     if (ramlps != 0 && rambps != 0) {
         ramtime = 1000000000/(2*ramlps);
         ramchunk = rambps/ramlps;
@@ -256,6 +291,14 @@ int main(int argc, char *argv[])
         if (ramchunk > TBUF) ramchunk = TBUF;
     }
 
+    /* avoid waiting 50000 ns collecting more sleep requests */
+    prctl(PR_SET_TIMERSLACK, 1L);
+
+    /* calibrate sleep loop */
+    clock_gettime(CLOCK_MONOTONIC, &mtime);
+    nsloop(10000000);
+    clock_gettime(CLOCK_MONOTONIC, &ttime);
+    nsloopfactor = 1.0*10000000/(difftimens(mtime, ttime)-50);
 
     extraerr = 1.0*outpersec/(outpersec+extrabps);
     nsec = (int) (1000000000*extraerr/loopspersec);
@@ -286,8 +329,6 @@ int main(int argc, char *argv[])
 
     /* we want buf % 8 = 0 */
     if (! (buf = malloc(blen+ilen+2*olen+8)) ) {
-        fprintf(stderr, "bufhrt: Cannot allocate buffer of length %ld.\n",
-                blen+ilen+olen);
         exit(6);
     }
     while (((uintptr_t)buf % 8) != 0) buf++;
@@ -299,10 +340,9 @@ int main(int argc, char *argv[])
     /* buffers for loop of output copies */
     if (outcopies > 0) {
         /* spend half of loop duration with copies of output chunk */
-        outtime = nsec/(2*outcopies);
+        outtime = nsec/(8*outcopies);
         for (i=1; i < outcopies; i++) {
             if (posix_memalign(obufs+i, 4096, 2*olen)) {
-                fprintf(stderr, "bufhrt: Cannot allocate buffer for output cleaning.\n");
                 exit(20);
             }
         }
@@ -312,20 +352,16 @@ int main(int argc, char *argv[])
     if (port != 0) {
         listenfd = socket(AF_INET, SOCK_STREAM, 0);
         if (listenfd < 0) {
-            fprintf(stderr, "bufhrt: Cannot create outgoing socket.\n");
             exit(9);
         }
         if (setsockopt(listenfd,
                        SOL_SOCKET,SO_REUSEADDR,&optval,sizeof(int)) == -1)
         {
-            fprintf(stderr, "bufhrt: Cannot set REUSEADDR.\n");
             exit(10);
         }
         if (outnetbufsize != 0 && setsockopt(listenfd,
                        SOL_SOCKET,SO_SNDBUF,&outnetbufsize,sizeof(int)) == -1)
         {
-            fprintf(stderr, "bufhrt: Cannot set outgoing network buffer to %d.\n",
-                    outnetbufsize);
             exit(30);
         }
         memset(&serv_addr, '0', sizeof(serv_addr));
@@ -334,12 +370,10 @@ int main(int argc, char *argv[])
         serv_addr.sin_port = htons(atoi(port));
         if (bind(listenfd, (struct sockaddr*)&serv_addr,
                                               sizeof(serv_addr)) == -1) {
-            fprintf(stderr, "bufhrt: Cannot bind outgoing socket.\n");
             exit(11);
         }
         listen(listenfd, 1);
         if ((connfd = accept(listenfd, (struct sockaddr*)NULL, NULL)) == -1) {
-            fprintf(stderr, "bufhrt: Cannot accept outgoing connection.\n");
             exit(12);
         }
     }
@@ -350,7 +384,6 @@ int main(int argc, char *argv[])
     for (; iptr < buf + 2*hlen - ilen; ) {
         s = read(ifd, iptr, ilen);
         if (s < 0) {
-            fprintf(stderr, "bufhrt: Read error.\n");
             exit(13);
         }
         icount += s;
@@ -366,7 +399,6 @@ int main(int argc, char *argv[])
         wnext = olen;
 
     if (clock_gettime(CLOCK_MONOTONIC, &mtime) < 0) {
-        fprintf(stderr, "bufhrt: Cannot get monotonic clock.\n");
         exit(14);
     }
 
@@ -389,9 +421,9 @@ int main(int argc, char *argv[])
         /* write a chunk, this comes first after waking from sleep */
         s = write(connfd, optr, wnext);
         if (s < 0) {
-            fprintf(stderr, "bufhrt: Write error.\n");
             exit(15);
         }
+
         ocount += s;
         optr += s;
         wnext = olen + wnext - s;
@@ -400,8 +432,6 @@ int main(int argc, char *argv[])
            wnext++;
         }
         if (wnext >= 2*olen) {
-           fprintf(stderr, "bufhrt: Underrun by %ld (%ld sec %ld nsec).\n",
-                     wnext - 2*olen, mtime.tv_sec, mtime.tv_nsec);
            wnext = 2*olen-1;
         }
         s = (iptr >= optr ? iptr - optr : iptr+blen-optr);
@@ -416,7 +446,6 @@ int main(int argc, char *argv[])
             memclean(iptr, ilen);
             s = read(ifd, iptr, ilen);
             if (s < 0) {
-                fprintf(stderr, "bufhrt: Read error.\n");
                 exit(16);
             }
 
@@ -437,11 +466,7 @@ int main(int argc, char *argv[])
     shutdown(listenfd, SHUT_RDWR);
     close(listenfd);
     close(ifd);
-    if (verbose)
-        fprintf(stderr, "bufhrt: Loops: %ld, total bytes: %lld in %lld out.\n"
-                        "bufhrt: Bad reads/bytes %ld/%ld and writes/bytes %ld/%ld.\n",
-                        count, icount, ocount, badreads, badreadbytes,
-                        badwrites, badwritebytes);
+
     return 0;
 }
 

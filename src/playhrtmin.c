@@ -172,7 +172,6 @@ int main(int argc, char *argv[])
              format = SND_PCM_FORMAT_DSD_U32_BE;
              bytespersample = 4;
           } else {
-             fprintf(stderr, "playhrt: Sample format %s not recognized.\n", optarg);
              exit(1);
           }
           break;
@@ -229,9 +228,6 @@ int main(int argc, char *argv[])
           fprintf(stderr,
                   "playhrt (version %s of frankl's stereo utilities",
                   VERSION);
-#ifdef ALSANC
-          fprintf(stderr, ", with alsa-lib patch");
-#endif
           fprintf(stderr, ")\n");
           exit(0);
         default:
@@ -242,7 +238,6 @@ int main(int argc, char *argv[])
     bytesperframe = bytespersample*nrchannels;
     /* check some arguments and set some parameters */
     if ((host == NULL || port == NULL) && sfd < 0) {
-       fprintf(stderr, "playhrt: Must specify --host and --port or --stdin.\n");
        exit(3);
     }
     /* compute nanoseconds per loop (wrt local clock) */
@@ -264,7 +259,6 @@ int main(int argc, char *argv[])
     /* temporary buffer */
     tbuf = NULL;     
     if (posix_memalign(&tbuf, 4096, 2*olen*bytesperframe)) {
-        fprintf(stderr, "myplayhrt: Cannot allocate buffer for cleaning.\n");
         exit(6);
     }        
 
@@ -287,8 +281,6 @@ int main(int argc, char *argv[])
 
     /* need blen plus some overlap for (circular) input buffer */
     if (! (buf = malloc(blen+ilen+(olen+extra)*bytesperframe)) ) {
-        fprintf(stderr, "playhrt: Cannot allocate buffer of length %ld.\n",
-                blen+ilen+(olen+extra)*bytesperframe);
         exit(2);
     }
     /* we put some overlap before the reference pointer */
@@ -306,8 +298,6 @@ int main(int argc, char *argv[])
         sfd = fd_net(host, port);
         if (innetbufsize != 0) {
             if (setsockopt(sfd, SOL_SOCKET, SO_RCVBUF, (void*)&innetbufsize, sizeof(int)) < 0) {
-                fprintf(stderr, "playhrt: Cannot set buffer size for network socket to %d.\n",
-                        innetbufsize);
                 exit(23);
             }
         }
@@ -319,69 +309,55 @@ int main(int argc, char *argv[])
     /* setup sound device */
     snd_pcm_hw_params_malloc(&hwparams);
     if (snd_pcm_open(&pcm_handle, pcm_name, SND_PCM_STREAM_PLAYBACK, 0) < 0) {
-        fprintf(stderr, "playhrt: Error opening PCM device %s\n", pcm_name);
         exit(5);
     }
     if (nonblock) {
         if (snd_pcm_nonblock(pcm_handle, 1) < 0) {
-            fprintf(stderr, "playhrt: Cannot set non-block mode.\n");
             exit(6);
         } 
     }
     if (snd_pcm_hw_params_any(pcm_handle, hwparams) < 0) {
-        fprintf(stderr, "playhrt: Cannot configure this PCM device.\n");
         exit(7);
     }
     if (snd_pcm_hw_params_set_access(pcm_handle, hwparams, access) < 0) {
-        fprintf(stderr, "playhrt: Error setting access.\n");
         exit(8);
     }
     if (snd_pcm_hw_params_set_format(pcm_handle, hwparams, format) < 0) {
-        fprintf(stderr, "playhrt: Error setting format.\n");
         exit(9);
     }
     if (snd_pcm_hw_params_set_rate(pcm_handle, hwparams, rate, 0) < 0) {
-        fprintf(stderr, "playhrt: Error setting rate.\n");
         exit(10);
     }
     if (snd_pcm_hw_params_set_channels(pcm_handle, hwparams, nrchannels) < 0) {
-        fprintf(stderr, "playhrt: Error setting channels to %d.\n", nrchannels);
         exit(11);
     }
     if (periodsize != 0) {
       if (snd_pcm_hw_params_set_period_size(
                                 pcm_handle, hwparams, periodsize, 0) < 0) {
-          fprintf(stderr, "playhrt: Error setting period size to %ld.\n", periodsize);
           exit(11);
       }
     }
     if (snd_pcm_hw_params_set_buffer_size(pcm_handle, hwparams,
                                                       hwbufsize) < 0) {
-        fprintf(stderr, "\nplayhrt: Error setting buffersize to %ld.\n", hwbufsize);
         exit(12);
     }
     snd_pcm_hw_params_get_buffer_size(hwparams, &hwbufsize);
 
     if (snd_pcm_hw_params(pcm_handle, hwparams) < 0) {
-        fprintf(stderr, "playhrt: Error setting HW params.\n");
         exit(13);
     }
     snd_pcm_hw_params_free(hwparams);
     if (snd_pcm_sw_params_malloc (&swparams) < 0) {
-        fprintf(stderr, "playhrt: Cannot allocate SW params.\n");
         exit(14);
     }
     if (snd_pcm_sw_params_current(pcm_handle, swparams) < 0) {
-        fprintf(stderr, "playhrt: Cannot get current SW params.\n");
         exit(15);
     }
     if (snd_pcm_sw_params_set_start_threshold(pcm_handle,
                                           swparams, hwbufsize/2) < 0) {
-        fprintf(stderr, "playhrt: Cannot set start threshold.\n");
         exit(16);
     }
     if (snd_pcm_sw_params(pcm_handle, swparams) < 0) {
-        fprintf(stderr, "playhrt: Cannot apply SW params.\n");
         exit(17);
     }
     snd_pcm_sw_params_free (swparams);
@@ -391,7 +367,6 @@ int main(int argc, char *argv[])
 
     /* get time */
     if (clock_gettime(CLOCK_MONOTONIC, &mtime) < 0) {
-        fprintf(stderr, "playhrt: Error getting monotonic clock.\n");
        	exit(19);
     }
 
@@ -408,7 +383,6 @@ int main(int argc, char *argv[])
 
         /* select() waits until pipeline is ready */
         if (select(sfd+1, &rdfs, NULL, NULL, NULL) <=0 ) {
-            fprintf(stderr, "playhrt: Error waiting for pipeline data.\n");
             exit(20);
         };
 
@@ -421,7 +395,6 @@ int main(int argc, char *argv[])
 	
     /* get time */
     if (clock_gettime(CLOCK_MONOTONIC, &mtime) < 0) {
-        fprintf(stderr, "playhrt: Error getting monotonic clock.\n");
        	exit(21);
     }
 
