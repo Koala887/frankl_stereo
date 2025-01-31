@@ -57,14 +57,28 @@ int main(int argc, char *argv[]) {
     printf("Measuring avg. time of clock_gettime() ...\n");
     d = 0;
     nloops = 10000;
-    for(i=0; i < nloops; i++) 
+    for(first=100, i=0; i < nloops+99; i++) 
     {
-      clock_gettime(CLOCK_MONOTONIC, &ttime);
+      clock_gettime(MYCLOCK, &ttime);
       clock_gettime(MYCLOCK, &tim);
-      d = d + difftimens(ttime, tim);
+      d = difftimens(ttime, tim);
+      if (first == 0) {
+        if (d < min)
+           min = d;
+        if (d > max)
+           max = d;
+        dev += d;
+      } else if (first == 1) {
+        min = d;
+        max = d;
+        first = 0;
+      } else 
+        first--;      
     }
-    dint = d/nloops;
-    printf("avg. time: %ld ns\n", dint);
+    dint = dev/nloops;
+    printf("    Min diff: %ld ns, max diff: %ld ns, \n"
+           "    avg. diff: %ld ns\n",
+           min, max, dev/nloops);
 
     printf("Measuring precision of clock_gettime() for 10 seconds ...\n");
     step = 1000000;
@@ -85,7 +99,7 @@ int main(int argc, char *argv[]) {
         res.tv_nsec -= 1000000000;
       }
       clock_nanosleep(MYCLOCK, TIMER_ABSTIME, &res, NULL);
-      clock_gettime(CLOCK_MONOTONIC, &ttime);
+      clock_gettime(MYCLOCK, &ttime);
       clock_gettime(MYCLOCK, &tim);
       d = difftimens(ttime, tim);
       k = d/dint;
