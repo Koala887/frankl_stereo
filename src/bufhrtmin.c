@@ -40,6 +40,7 @@ void usage( ) {
   fprintf(stderr,
           "bufhrt (version %s of frankl's stereo utilities)\nUSAGE:\n",
           VERSION);
+}          
 inline long difftimens(struct timespec t1, struct timespec t2)
 { 
    long long l1, l2;

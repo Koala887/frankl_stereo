@@ -54,13 +54,21 @@ int main(int argc, char *argv[]) {
   printf("monotonic resolution: %ld s %ld ns (%d)\n", res.tv_sec, res.tv_nsec, ret); 
 
   if (highresok && argc > 1) {
-    
+    printf("Measuring avg. time of clock_gettime() ...\n");
+    d = 0;
+    nloops = 10000;
+    for(i=0; i < nloops; i++) 
+    {
+      clock_gettime(CLOCK_MONOTONIC, &ttime);
+      clock_gettime(MYCLOCK, &tim);
+      d = d + difftimens(ttime, tim);
+    }
+    dint = d/nloops;
+    printf("avg. time: %ld ns\n", dint);
+
     printf("Measuring precision of clock_gettime() for 10 seconds ...\n");
     step = 1000000;
     nloops = 10000;
-    clock_gettime(CLOCK_MONOTONIC, &ttime);
-    clock_gettime(MYCLOCK, &tim);
-    dint = difftimens(ttime, tim);
     min = 0;
     max = 0;
     dev =0;
