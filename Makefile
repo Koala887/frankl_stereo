@@ -15,7 +15,7 @@ CFLAGSNO=-O0 -Wall -z execstack -D_FILE_OFFSET_BITS=64 -fgnu89-inline -DREFRESH$
 #ALL: bin tmp bin/volrace bin/bufhrt bin/bufhrtmin bin/highrestest \
 #     bin/writeloop bin/catloop bin/playhrt bin/playhrtmin bin/playhrtbuschel bin/cptoshm bin/shmcat \
 #     bin/resample_soxr bin/cat64 bin/shownfinfo bin/music2nf
-ALL: bin tmp bin/bufhrt bin/bufhrtmin bin/highrestest \
+ALL: bin tmp bin/bufhrt bin/bufhrtmin bin/highrestest bin/highrestest2 \
      bin/writeloop bin/catloop bin/playhrt bin/playhrtmin bin/playhrtbuschel
 
 bin:
@@ -63,6 +63,9 @@ bin/bufhrt: src/version.h tmp/net.o src/bufhrt.c tmp/cprefresh.o tmp/cprefresh_a
 
 bin/highrestest: src/highrestest.c |bin
 	$(CC) $(CFLAGSNO) -o bin/highrestest src/highrestest.c -lrt
+
+bin/highrestest2: src/highrestest2.c |bin
+	$(CC) $(CFLAGSNO) -o bin/highrestest2 src/highrestest2.c -lrt
 
 bin/writeloop: src/version.h src/nf_io.h src/writeloop.c tmp/cprefresh.o tmp/cprefresh_ass.o |bin
 	$(CC) $(CFLAGS) -o bin/writeloop tmp/cprefresh.o tmp/cprefresh_ass.o src/writeloop.c -lpthread -lrt
