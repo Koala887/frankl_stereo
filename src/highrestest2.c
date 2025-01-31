@@ -132,14 +132,37 @@ int main(int argc, char *argv[]) {
     printf(" >  10*%ld        %ld\n", dint, count[20]);
 
     printf("--------------------------------------\n");
-    printf("Measuring actual precision with correction loops for 10 seconds ...\n");
-
     /* calibrate sleep loop */
-    clock_gettime(CLOCK_MONOTONIC, &res);
-    nsloop(100000000);
-    clock_gettime(CLOCK_MONOTONIC, &ttime);
-    nsloopfactor = 1.0*100000000/(difftimens(res, ttime)-50);
+    printf("calibrate sleep loop nsloop() ...\n");
+    d = 0;
+    nloops = 1000;
+    for(first=100, i=0; i < nloops+99; i++) 
+    {
+      clock_gettime(MYCLOCK, &res);
+      nsloop(100000000);
+      clock_gettime(MYCLOCK, &ttime);
+      d = difftimens(res, ttime);
+      if (first == 0) {
+        if (d < min)
+           min = d;
+        if (d > max)
+           max = d;
+        dev += d;
+      } else if (first == 1) {
+        min = d;
+        max = d;
+        first = 0;
+      } else 
+        first--;      
+    }
+    nsloopfactor = 1.0*100000000/(difftimens(res, ttime)-dint);
+    printf("    Min diff: %ld ns, max diff: %ld ns, \n"
+           "    avg. diff: %ld ns\n",
+           min, max, dev/nloops);
+
     printf("nsloopfactor is %lf\n",nsloopfactor);
+    printf("--------------------------------------\n");
+    printf("Measuring actual precision with correction loops for 10 seconds ...\n");
 
     step = 1000000;
     nloops = 10000;
