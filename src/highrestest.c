@@ -49,9 +49,9 @@ static inline long  nsloop(long cnt) {
 /* a simple test of the resolution of several CLOCKs */
 int main(int argc, char *argv[]) {
   int ret, err, highresok, first, nloops, i, k, shift;
-  long step, d, min, max, dev, dint, count[21];
+  long mult, shift, step, d, min, max, dev, dint, count[21];
   struct timespec res, last, tim, ttime;
-
+  long long tsc_freq_sec;
   struct perf_event_attr pe = {
       .type = PERF_TYPE_HARDWARE,
       .size = sizeof(struct perf_event_attr),
@@ -78,6 +78,12 @@ int main(int argc, char *argv[]) {
   printf("%16s   %5s\n", "mult", "shift");
   printf("%16" PRIu32 "   %5" PRIu16 "\n", pc->time_mult, pc->time_shift);
   close(fd);
+  mult = pc->time_mult;
+  shift = pc->time_shift;
+  tsc_freq_sec = 1000000000;
+  tsc_freq_sec <<= shift;
+  tsc_freq_sec /= mult;
+  printf("tsc freq Hz: %d\n", tsc_freq_sec); 
 
   rdtsc_calibrate();
   
