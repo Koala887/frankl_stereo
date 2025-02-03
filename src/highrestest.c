@@ -59,7 +59,7 @@ static inline long  nsloop(long cnt) {
 /* a simple test of the resolution of several CLOCKs */
 int main(int argc, char *argv[]) {
   int ret, err, highresok, first, nloops, i, k, shift;
-  long mult, shift, step, d, min, max, dev, dint, count[21];
+  long multi, shifti, step, d, min, max, dev, dint, count[21];
   struct timespec res, last, tim, ttime;
   long long start_ticks, end_ticks, last_ticks;
   long long tsc_freq_sec;
@@ -89,14 +89,13 @@ int main(int argc, char *argv[]) {
   printf("%16s   %5s\n", "mult", "shift");
   printf("%16" PRIu32 "   %5" PRIu16 "\n", pc->time_mult, pc->time_shift);
   close(fd);
-  mult = pc->time_mult;
-  shift = pc->time_shift;
+  multi = pc->time_mult;
+  shifti = pc->time_shift;
   tsc_freq_sec = 1000000000;
-  tsc_freq_sec <<= shift;
-  tsc_freq_sec /= mult;
-  printf("tsc freq Hz: %d\n", tsc_freq_sec); 
+  tsc_freq_sec <<= shifti;
+  tsc_freq_sec /= multi;
+  printf("tsc freq Hz: %lld\n", tsc_freq_sec); 
 
-  rdtsc_calibrate();
   
   if (argc == 2 && (strcmp(argv[1],"-h") == 0 || strcmp(argv[1],"--help") == 0)) {
      fprintf(stderr, "Usage: no argument - simple test\n  highresttest intv shift - with statistics\n  intv: interval, shift: delay for more precision\n\n");
@@ -159,7 +158,7 @@ int main(int argc, char *argv[]) {
       if (k > 10) k = 10;
       count[k+10]++;
       last = tim;
-      last_ticks = start_ticks;
+      start_ticks = end_ticks;
 
       //printf("%ld\n", d);
       if (first == 0) {
