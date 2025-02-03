@@ -5,8 +5,11 @@ This file is part of frankl's stereo utilities.
 See the file License.txt of the distribution and 
 http://www.gnu.org/licenses/gpl.txt for license details.
 */
+#include <asm/unistd.h>
 #include <inttypes.h>
 #include <unistd.h>
+#include <linux/perf_event.h>
+#include <sys/mman.h>
 #include <time.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,91 +19,11 @@ http://www.gnu.org/licenses/gpl.txt for license details.
 #include "rdtsc.h"
 //#define MYCLOCK CLOCK_MONOTONIC_RAW
 #define MYCLOCK CLOCK_MONOTONIC
-const void* resolve_kernel_symbol(const char* name) {
-    FILE* file;
-    char buffer[0x100];
-    const void* result = NULL;
-    char* saveptr;
 
-    file = fopen("/proc/kallsyms", "rt");
-    if (!file)
-        return NULL;
-
-    while (fgets(buffer, sizeof buffer, file)) {
-        const char* next, *address = strtok_r(buffer, " ", &saveptr);
-
-        if (!address)
-            continue;
-
-        if (!strtok_r(NULL, " ", &saveptr))
-            continue;
-
-        next = strtok_r(NULL, "\n", &saveptr);
-        if (!next)
-            continue;
-
-        if (!strcmp(name, next)) {
-            result = (const void*)strtoul(address, &saveptr, 0x10);
-            goto end;
-        }
-    }
-
-end:
-    fclose(file);
-    return result;
-}
-
-int read_kernel_int(const void* address) {
-    int prog_fd, result;
-
-    const struct bpf_insn program[] = {                 /* r10 = stack */
-        /* Load the first argument (the destination address, local variable). */
-        BPF_MOV64_REG(BPF_REG_1, BPF_REG_10),           /* r1 = stk */
-        BPF_ALU64_IMM(BPF_ADD, BPF_REG_1, -4),          /* r1 -= 4  */
-
-        /* Load the second argument, 4 (sizeof int). */
-        BPF_MOV64_IMM(BPF_REG_2, 4),                    /* r2 = 4   */
-
-        /* Load the third argument, address of symbol. */
-        BPF_LD_IMM64(BPF_REG_3, (long)address),
-
-        /* Call bpf_probe_read_kernel. */
-        BPF_JMP_IMM(BPF_CALL, 0, (long)bpf_probe_read_kernel, 0),
-
-        /* Set the exit code to the read value. */
-        /* r1 is caller-saved, so cannot be used. */
-        BPF_LDX_MEM(BPF_W, BPF_REG_0, BPF_REG_10, -4), /* r0 = *((u32*)stk-1) */
-        BPF_EXIT_INSN()
-    };
-
-    {
-        union bpf_attr attr = {0};
-        attr.prog_type = BPF_PROG_TYPE_RAW_TRACEPOINT;
-        attr.insns = (__u64)program;
-        attr.insn_cnt = sizeof program/sizeof program[0];
-        attr.license = (__u64)"GPL";
-
-        if ((prog_fd = syscall(SYS_bpf, BPF_PROG_LOAD, &attr, sizeof attr)) < 0)
-            return -1;
-    }
-
-    {
-        union bpf_attr attr = {0};
-        attr.test.prog_fd = prog_fd;
-        if (syscall(SYS_bpf, BPF_PROG_TEST_RUN, &attr, sizeof attr) < 0) {
-            result = -1;
-            goto out;
-        }
-        result = attr.test.retval;
-    }
-
-out:
-    close(prog_fd);
-    return result;
-}
-
-int get_tsc_freq(void) {
-    return read_kernel_int(resolve_kernel_symbol("tsc_khz"));
+static long perf_event_open(struct perf_event_attr *hw_event, pid_t pid,
+           int cpu, int group_fd, unsigned long flags)
+{
+    return syscall(__NR_perf_event_open, hw_event, pid, cpu, group_fd, flags);
 }
 
 /* t2 - t1 in nanoseconds */
@@ -128,6 +51,33 @@ int main(int argc, char *argv[]) {
   int ret, err, highresok, first, nloops, i, k, shift;
   long step, d, min, max, dev, dint, count[21];
   struct timespec res, last, tim, ttime;
+
+  struct perf_event_attr pe = {
+      .type = PERF_TYPE_HARDWARE,
+      .size = sizeof(struct perf_event_attr),
+      .config = PERF_COUNT_HW_INSTRUCTIONS,
+      .disabled = 1,
+      .exclude_kernel = 1,
+      .exclude_hv = 1
+  };
+  int fd = perf_event_open(&pe, 0, -1, -1, 0);
+  if (fd == -1) {
+      perror("perf_event_open failed");
+      return 1;
+  }
+  void *addr = mmap(NULL, 4*1024, PROT_READ, MAP_SHARED, fd, 0);
+  if (!addr) {
+      perror("mmap failed");
+      return 1;
+  }
+  struct perf_event_mmap_page *pc = addr;
+  if (pc->cap_user_time != 1) {
+      fprintf(stderr, "Perf system doesn't support user time\n");
+      return 1;
+  }
+  printf("%16s   %5s\n", "mult", "shift");
+  printf("%16" PRIu32 "   %5" PRIu16 "\n", pc->time_mult, pc->time_shift);
+  close(fd);
 
   rdtsc_calibrate();
   
