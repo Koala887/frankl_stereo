@@ -19,7 +19,8 @@ http://www.gnu.org/licenses/gpl.txt for license details.
 #include <time.h>
 #include <alsa/asoundlib.h>
 #include "cprefresh.h"
-
+#include <linux/prctl.h>
+#include <sys/prctl.h>
 /* help page */
 /* vim hint to remove resp. add quotes:
       s/^"\(.*\)\\n"$/\1/
@@ -342,6 +343,9 @@ int main(int argc, char *argv[])
         {"help", no_argument, 0, 'h' },
         {0,         0,                 0,  0 }
     };
+
+    /* avoid waiting 50000 ns collecting more sleep requests */
+    prctl(PR_SET_TIMERSLACK, 1L);
 
     if (argc == 1) {
        usage();

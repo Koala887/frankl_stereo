@@ -155,7 +155,7 @@ int main(int argc, char *argv[]) {
       } else 
         first--;      
     }
-    nsloopfactor = 1.0*100000000/(difftimens(res, ttime)-dint);
+    nsloopfactor = 1.0*100000000/(dev/nloops-dint);
     printf("    Min diff: %ld ns, max diff: %ld ns, \n"
            "    avg. diff: %ld ns\n",
            min, max, dev/nloops);
