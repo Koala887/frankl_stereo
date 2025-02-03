@@ -24,9 +24,9 @@ http://www.gnu.org/licenses/gpl.txt for license details.
 
 static inline unsigned long long read_tsc(void)
 { unsigned long long tsc;
-  _mm_lfence();
+  //_mm_lfence();
   tsc = __rdtsc();
-  _mm_lfence();
+  //_mm_lfence();
   return (tsc);
 }
 
