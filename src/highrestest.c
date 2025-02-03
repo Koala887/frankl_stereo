@@ -16,9 +16,19 @@ http://www.gnu.org/licenses/gpl.txt for license details.
 #include <string.h>
 #include <linux/prctl.h>
 #include <sys/prctl.h>
-#include "rdtsc.h"
+#include <emmintrin.h> 
+#include <x86intrin.h>
+
 //#define MYCLOCK CLOCK_MONOTONIC_RAW
 #define MYCLOCK CLOCK_MONOTONIC
+
+static inline unsigned long long read_tsc(void)
+{ unsigned long long tsc;
+  _mm_lfence();
+  tsc = __rdtsc();
+  _mm_lfence();
+  return (tsc);
+}
 
 static long perf_event_open(struct perf_event_attr *hw_event, pid_t pid,
            int cpu, int group_fd, unsigned long flags)
@@ -51,6 +61,7 @@ int main(int argc, char *argv[]) {
   int ret, err, highresok, first, nloops, i, k, shift;
   long mult, shift, step, d, min, max, dev, dint, count[21];
   struct timespec res, last, tim, ttime;
+  long long start_ticks, end_ticks, last_ticks;
   long long tsc_freq_sec;
   struct perf_event_attr pe = {
       .type = PERF_TYPE_HARDWARE,
@@ -119,7 +130,7 @@ int main(int argc, char *argv[]) {
 
   if (highresok && argc > 1) {
     
-    printf("Measuring actual precision of monotonic clock for 10 seconds ...\n");
+    printf("Measuring actual precision of rdtsc() for 10 seconds ...\n");
     step = 1000000;
     nloops = 10000;
     dint = atoi(argv[1]);
@@ -129,20 +140,18 @@ int main(int argc, char *argv[]) {
     max = 0;
     dev =0;
     clock_gettime(MYCLOCK, &res);
+    start_ticks = read_tsc();
     last = res;
-    
+    last_ticks = start_ticks;
     for(i=0; i<21; count[i]=0, i++);
     /* avoid some startup jitter */
     for(first=100, i=0; i < nloops+99; i++) 
     {
-      res.tv_nsec = res.tv_nsec+step;
-      if (res.tv_nsec > 999999999) {
-        res.tv_sec++;
-        res.tv_nsec -= 1000000000;
-      }
+      end_ticks = start_ticks + step*tsc_freq_sec/1000000000ull;
       do {
-        err = clock_nanosleep(MYCLOCK, TIMER_ABSTIME, &res, NULL);
-      } while (err !=0 );
+        start_ticks = read_tsc();
+      } while (start_ticks < end_ticks);
+
       clock_gettime(MYCLOCK, &tim);
       d = difftimens(last, tim)-step;
       k = d/dint;
@@ -150,6 +159,7 @@ int main(int argc, char *argv[]) {
       if (k > 10) k = 10;
       count[k+10]++;
       last = tim;
+      last_ticks = start_ticks;
 
       //printf("%ld\n", d);
       if (first == 0) {
