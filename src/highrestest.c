@@ -136,6 +136,7 @@ int main(int argc, char *argv[]) {
     min = 0;
     max = 0;
     dev =0;
+    end_ticks=(step*tsc_freq_sec/1000000000ull);
     clock_gettime(MYCLOCK, &res);
     start_ticks = __rdtsc();//read_tsc();
     last = res;
@@ -143,7 +144,7 @@ int main(int argc, char *argv[]) {
     /* avoid some startup jitter */
     for(first=100, i=0; i < nloops+99; i++) 
     {
-      start_ticks += (step*tsc_freq_sec/1000000000ull);
+      start_ticks += end_ticks; 
       //do {
       //  end_ticks = read_tsc();
       while (start_ticks > __rdtsc());
