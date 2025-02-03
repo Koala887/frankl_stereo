@@ -32,6 +32,8 @@ bin/volrace: src/version.h src/volrace.c tmp/cprefresh.o tmp/cprefresh_ass.o |bi
 
 tmp/net.o: src/net.h src/net.c |tmp 
 	$(CC) $(CFLAGS) -c -o tmp/net.o src/net.c
+tmp/rdtsc.o: src/rdtsc.h src/rdtsc.c |tmp 
+	$(CC) $(CFLAGS) -c -o tmp/rdtsc.o src/rdtsc.c
 
 tmp/cprefresh_ass.o: src/cprefresh_default.s src/cprefresh_vfp.s src/cprefresh_arm.s |tmp 
 	if [ $(REFRESH) = "" ]; then \
