@@ -91,9 +91,7 @@ int main(int argc, char *argv[]) {
   /* avoid waiting 50000 ns collecting more sleep requests */
   prctl(PR_SET_TIMERSLACK, 1L);
 
-  ret = get_tsc_freq();
-  printf("get tsc freq: %d\n", ret); 
-
+  
   ret = clock_getres(CLOCK_REALTIME, &res);
   printf("realtime resolution: %ld s %ld ns (%d)\n", res.tv_sec, res.tv_nsec, ret); 
 

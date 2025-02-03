@@ -61,8 +61,8 @@ bin/playhrt_static: src/version.h tmp/net.o src/playhrt.c tmp/cprefresh.o tmp/cp
 bin/bufhrt: src/version.h tmp/net.o src/bufhrt.c tmp/cprefresh.o tmp/cprefresh_ass.o |bin
 	$(CC) $(CFLAGSNO) -o bin/bufhrt tmp/net.o tmp/cprefresh.o tmp/cprefresh_ass.o src/bufhrt.c -lpthread -lrt
 
-bin/highrestest: src/highrestest.c |bin
-	$(CC) $(CFLAGSNO) -o bin/highrestest src/highrestest.c -lrt
+bin/highrestest: tmp/rdtsc.o src/highrestest.c |bin
+	$(CC) $(CFLAGSNO) -o bin/highrestest tmp/rdtsc.o src/highrestest.c -lrt
 
 bin/highrestest2: src/highrestest2.c |bin
 	$(CC) $(CFLAGSNO) -o bin/highrestest2 src/highrestest2.c -lrt
