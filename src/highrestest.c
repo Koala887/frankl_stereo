@@ -137,16 +137,16 @@ int main(int argc, char *argv[]) {
     max = 0;
     dev =0;
     clock_gettime(MYCLOCK, &res);
-    start_ticks = read_tsc();
+    start_ticks = __rdtsc();//read_tsc();
     last = res;
     for(i=0; i<21; count[i]=0, i++);
     /* avoid some startup jitter */
     for(first=100, i=0; i < nloops+99; i++) 
     {
       start_ticks += (step*tsc_freq_sec/1000000000ull);
-      do {
-        end_ticks = read_tsc();
-      } while (start_ticks > end_ticks);
+      //do {
+      //  end_ticks = read_tsc();
+      while (start_ticks > __rdtsc());
 
       clock_gettime(MYCLOCK, &tim);
       d = difftimens(last, tim)-step;
