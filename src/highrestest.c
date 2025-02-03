@@ -86,8 +86,6 @@ int main(int argc, char *argv[]) {
       fprintf(stderr, "Perf system doesn't support user time\n");
       return 1;
   }
-  printf("%16s   %5s\n", "mult", "shift");
-  printf("%16" PRIu32 "   %5" PRIu16 "\n", pc->time_mult, pc->time_shift);
   close(fd);
   multi = pc->time_mult;
   shifti = pc->time_shift;
@@ -141,15 +139,14 @@ int main(int argc, char *argv[]) {
     clock_gettime(MYCLOCK, &res);
     start_ticks = read_tsc();
     last = res;
-    last_ticks = start_ticks;
     for(i=0; i<21; count[i]=0, i++);
     /* avoid some startup jitter */
     for(first=100, i=0; i < nloops+99; i++) 
     {
-      end_ticks = start_ticks + step*tsc_freq_sec/1000000000ull;
+      start_ticks += (step*tsc_freq_sec/1000000000ull);
       do {
-        start_ticks = read_tsc();
-      } while (start_ticks < end_ticks);
+        end_ticks = read_tsc();
+      } while (start_ticks > end_ticks);
 
       clock_gettime(MYCLOCK, &tim);
       d = difftimens(last, tim)-step;
@@ -158,7 +155,6 @@ int main(int argc, char *argv[]) {
       if (k > 10) k = 10;
       count[k+10]++;
       last = tim;
-      start_ticks = end_ticks;
 
       //printf("%ld\n", d);
       if (first == 0) {
