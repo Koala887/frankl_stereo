@@ -175,7 +175,7 @@ int main(int argc, char *argv[]) {
         end_ticks = read_tsc();
       }while (start_ticks > end_ticks);
 
-      d = ticks_to_ns((end_ticks-last_ticks)-step_ticks);
+      d = (ticks_to_ns(end_ticks-last_ticks)-step);
       k = d/dint;
       if (k < -10) k = -10;
       if (k > 10) k = 10;
@@ -242,7 +242,7 @@ int main(int argc, char *argv[]) {
 
       nsloop(shift_ticks - (end_ticks - start_ticks));
       end_ticks = read_tsc();
-      d = ticks_to_ns((end_ticks-last_ticks)-step_ticks);
+      d = (ticks_to_ns(end_ticks-last_ticks)-step);
       k = d/dint;
       if (k < -10) k = -10;
       if (k > 10) k = 10;
