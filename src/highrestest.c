@@ -58,8 +58,8 @@ long long get_tsc_freq(void)
       fprintf(stderr, "Perf system doesn't support user time\n");
       return 1;
   }
-  printf("%16s   %5s\n", "mult", "shift");
-  printf("%16" PRIu32 "   %5" PRIu16 "\n", pc->time_mult, pc->time_shift);
+  printf("TSC-Mult:" PRIu32 "\n", pc->time_mult);
+  printf("TSC-Shift:" PRIu16 "\n", pc->time_shift);
   close(fd);
   
   __uint128_t x = 1000000000ull;
@@ -92,29 +92,11 @@ long ns_to_ticks(long ns)
     return (x);
 }	
 
-/* t2 - t1 in nanoseconds */
-long difftimens(struct timespec t1, struct timespec t2)
-{ 
-   long long l1, l2;
-   l1 = t1.tv_sec*1000000000 + t1.tv_nsec;
-   l2 = t2.tv_sec*1000000000 + t2.tv_nsec;
-   return (long)(l2-l1);
-}
-
-
-static inline long  nsloop(long cnt) {
-  long i;
-  for (i = (long)(cnt*nsloopfactor); i > 0; i--) {
-    __asm volatile ("nop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\n");
-  }  
-  return i;
-}
-
 /* a simple test of the resolution of several CLOCKs */
 int main(int argc, char *argv[]) {
-  int ret, err, highresok, first, nloops, i, k, shift;
+  int ret, highresok, first, nloops, i, k, shift;
   long step, d, min, max, dev, dint, count[21];
-  struct timespec res, last, tim, ttime;
+  struct timespec res, tim;
   long long start_ticks, shift_ticks, end_ticks, last_ticks, step_ticks;
   
   if (argc == 2 && (strcmp(argv[1],"-h") == 0 || strcmp(argv[1],"--help") == 0)) {
@@ -129,7 +111,7 @@ int main(int argc, char *argv[]) {
  
   /* get tsc frequency */
   tsc_freq_hz = get_tsc_freq();
-  printf("tsc freq Hz: %lld\n", tsc_freq_hz); 
+  printf("TSC Frequency: %lld Hz\n", tsc_freq_hz); 
 
   ret = clock_getres(CLOCK_REALTIME, &res);
   printf("realtime resolution: %ld s %ld ns (%d)\n", res.tv_sec, res.tv_nsec, ret); 
@@ -175,73 +157,6 @@ int main(int argc, char *argv[]) {
         end_ticks = read_tsc();
       }while (start_ticks > end_ticks);
 
-      d = (ticks_to_ns(end_ticks-last_ticks)-step);
-      k = d/dint;
-      if (k < -10) k = -10;
-      if (k > 10) k = 10;
-      count[k+10]++;
-      last_ticks = end_ticks;
-
-      //printf("%ld\n", d);
-      if (first == 0) {
-        if (d < min)
-           min = d;
-        if (d > max)
-           max = d;
-        dev += d;
-      } else if (first == 1) {
-        min = d;
-        max = d;
-        first = 0;
-      } else 
-        first--;
-    }
-    printf("    Min diff: %ld ns, max diff: %ld ns, \n"
-           "    avg. diff: %ld ns\n",
-           min, max, dev/nloops);
-    printf("   diff in ns      count\n");
-    printf(" < -10*%ld        %ld\n", dint, count[0]);
-    for(i=-9; i<10; i++)
-        printf("    %d*%ld        %ld\n", i, dint, count[i+10]);
-    printf(" >  10*%ld        %ld\n", dint, count[20]);
-
-    printf("--------------------------------------\n");
-    printf("Measuring actual precision with correction loops for 10 seconds ...\n");
-
-    /* calibrate sleep loop */
-    start_ticks = read_tsc();
-    nsloop(1000000);
-    end_ticks = read_tsc();
-    nsloopfactor = 1.0*1000000/(end_ticks-start_ticks);
-    printf("nsloopfactor is %lf\n",nsloopfactor);
-
-    step = 1000000;
-    nloops = 10000;
-    shift = 100000;
-    if (argc > 2) 
-      shift = atoi(argv[2]);
-    if (shift <= 0)
-      shift = 100000;
-    shift_ticks = ns_to_ticks(shift);
-    min = 0;
-    max = 0;
-    dev =0;
-	// calculate ticks per step
-    step_ticks= ns_to_ticks(step);
-    for(i=0; i<21; count[i]=0, i++);
-    start_ticks = read_tsc();
-    last_ticks = start_ticks;
-    
-    /* avoid some startup jitter */
-    for(first=100, i=0; i < nloops+99; i++) 
-    {
-      start_ticks += step_ticks; 
-      do {
-        end_ticks = read_tsc();
-      }while (start_ticks > end_ticks);
-
-      nsloop(shift_ticks - (end_ticks - start_ticks));
-      end_ticks = read_tsc();
       d = (ticks_to_ns(end_ticks-last_ticks)-step);
       k = d/dint;
       if (k < -10) k = -10;
