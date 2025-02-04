@@ -58,8 +58,8 @@ long long get_tsc_freq(void)
       fprintf(stderr, "Perf system doesn't support user time\n");
       return 1;
   }
-  printf("TSC-Mult: %d \n", pc->time_mult);
-  printf("TSC-Shift: %d \n", pc->time_shift);
+  printf("TSC-Mult: %u \n", pc->time_mult);
+  printf("TSC-Shift: %u \n", pc->time_shift);
   close(fd);
   
   __uint128_t x = 1000000000ull;
