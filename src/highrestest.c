@@ -58,6 +58,8 @@ long long get_tsc_freq(void)
       fprintf(stderr, "Perf system doesn't support user time\n");
       return 1;
   }
+  printf("%16s   %5s\n", "mult", "shift");
+  printf("%16" PRIu32 "   %5" PRIu16 "\n", pc->time_mult, pc->time_shift);
   close(fd);
   
   __uint128_t x = 1000000000ull;
@@ -68,9 +70,9 @@ long long get_tsc_freq(void)
 
 static inline unsigned long long read_tsc(void)
 { unsigned long long tsc;
-  //_mm_lfence();
+  _mm_lfence();
   tsc = __rdtsc();
-  //_mm_lfence();
+  _mm_lfence();
   return (tsc);
 }
 
