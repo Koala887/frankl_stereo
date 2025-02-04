@@ -58,8 +58,8 @@ long long get_tsc_freq(void)
       fprintf(stderr, "Perf system doesn't support user time\n");
       return 1;
   }
-  printf("TSC-Mult:" PRIu32 "\n", pc->time_mult);
-  printf("TSC-Shift:" PRIu16 "\n", pc->time_shift);
+  printf("TSC-Mult: %lld \n", pc->time_mult);
+  printf("TSC-Shift: %lld \n", pc->time_shift);
   close(fd);
   
   __uint128_t x = 1000000000ull;
@@ -94,10 +94,10 @@ long ns_to_ticks(long ns)
 
 /* a simple test of the resolution of several CLOCKs */
 int main(int argc, char *argv[]) {
-  int ret, highresok, first, nloops, i, k, shift;
+  int ret, highresok, first, nloops, i, k;
   long step, d, min, max, dev, dint, count[21];
   struct timespec res, tim;
-  long long start_ticks, shift_ticks, end_ticks, last_ticks, step_ticks;
+  long long start_ticks, end_ticks, last_ticks, step_ticks;
   
   if (argc == 2 && (strcmp(argv[1],"-h") == 0 || strcmp(argv[1],"--help") == 0)) {
      fprintf(stderr, "Usage: no argument - simple test\n  highresttest intv shift - with statistics\n  intv: interval, shift: delay for more precision\n\n");
