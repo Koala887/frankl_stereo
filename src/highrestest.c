@@ -127,7 +127,8 @@ int main(int argc, char *argv[]) {
  
   /* get tsc frequency */
   tsc_freq_hz = get_tsc_freq();
-  
+  printf("tsc freq Hz: %lld\n", tsc_freq_hz); 
+
   ret = clock_getres(CLOCK_REALTIME, &res);
   printf("realtime resolution: %ld s %ld ns (%d)\n", res.tv_sec, res.tv_nsec, ret); 
 
@@ -161,7 +162,7 @@ int main(int argc, char *argv[]) {
 	// calculate ticks per step
     step_ticks= ns_to_ticks(step);
     for(i=0; i<21; count[i]=0, i++);
-    start_ticks = __rdtsc();//read_tsc();
+    start_ticks = read_tsc();
     last_ticks = start_ticks;
 
     /* avoid some startup jitter */
@@ -206,7 +207,7 @@ int main(int argc, char *argv[]) {
     printf("Measuring actual precision with correction loops for 10 seconds ...\n");
 
     /* calibrate sleep loop */
-    start_ticks = __rdtsc();
+    start_ticks = read_tsc();
     nsloop(1000000);
     end_ticks = read_tsc();
     nsloopfactor = 1.0*1000000/(end_ticks-start_ticks);
@@ -226,7 +227,7 @@ int main(int argc, char *argv[]) {
 	// calculate ticks per step
     step_ticks= ns_to_ticks(step);
     for(i=0; i<21; count[i]=0, i++);
-    start_ticks = __rdtsc();//read_tsc();
+    start_ticks = read_tsc();
     last_ticks = start_ticks;
     
     /* avoid some startup jitter */
