@@ -15,7 +15,7 @@ CFLAGSNO=-O0 -Wall -z execstack -D_FILE_OFFSET_BITS=64 -fgnu89-inline -DREFRESH$
 #ALL: bin tmp bin/volrace bin/bufhrt bin/bufhrtmin bin/highrestest \
 #     bin/writeloop bin/catloop bin/playhrt bin/playhrtmin bin/playhrtbuschel bin/cptoshm bin/shmcat \
 #     bin/resample_soxr bin/cat64 bin/shownfinfo bin/music2nf
-ALL: bin tmp bin/bufhrt bin/bufhrtmin bin/highrestest bin/highrestest2 \
+ALL: bin tmp bin/bufhrt bin/bufhrtmin bin/highrestest bin/highrestest-tsc \
      bin/writeloop bin/catloop bin/playhrt bin/playhrtmin bin/playhrtbuschel
 
 bin:
@@ -32,8 +32,6 @@ bin/volrace: src/version.h src/volrace.c tmp/cprefresh.o tmp/cprefresh_ass.o |bi
 
 tmp/net.o: src/net.h src/net.c |tmp 
 	$(CC) $(CFLAGS) -c -o tmp/net.o src/net.c
-tmp/rdtsc.o: src/rdtsc.h src/rdtsc.c |tmp 
-	$(CC) $(CFLAGS) -c -o tmp/rdtsc.o src/rdtsc.c
 
 tmp/cprefresh_ass.o: src/cprefresh_default.s src/cprefresh_vfp.s src/cprefresh_arm.s |tmp 
 	if [ $(REFRESH) = "" ]; then \
@@ -63,11 +61,11 @@ bin/playhrt_static: src/version.h tmp/net.o src/playhrt.c tmp/cprefresh.o tmp/cp
 bin/bufhrt: src/version.h tmp/net.o src/bufhrt.c tmp/cprefresh.o tmp/cprefresh_ass.o |bin
 	$(CC) $(CFLAGSNO) -o bin/bufhrt tmp/net.o tmp/cprefresh.o tmp/cprefresh_ass.o src/bufhrt.c -lpthread -lrt
 
-bin/highrestest: tmp/rdtsc.o src/highrestest.c |bin
-	$(CC) $(CFLAGSNO) -o bin/highrestest tmp/rdtsc.o src/highrestest.c -lrt
+bin/highrestest: src/highrestest.c |bin
+	$(CC) $(CFLAGSNO) -o bin/highrestest src/highrestest.c -lrt
 
-bin/highrestest2: src/highrestest2.c |bin
-	$(CC) $(CFLAGSNO) -o bin/highrestest2 src/highrestest2.c -lrt
+bin/highrestest-tsc: src/highrestest-tsc.c |bin
+	$(CC) $(CFLAGSNO) -o bin/highrestest-tsc src/highrestest-tsc.c -lrt
 
 bin/writeloop: src/version.h src/nf_io.h src/writeloop.c tmp/cprefresh.o tmp/cprefresh_ass.o |bin
 	$(CC) $(CFLAGS) -o bin/writeloop tmp/cprefresh.o tmp/cprefresh_ass.o src/writeloop.c -lpthread -lrt
