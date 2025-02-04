@@ -170,7 +170,7 @@ int main(int argc, char *argv[]) {
       start_ticks += step_ticks; 
       do {
         end_ticks = read_tsc();
-      while (start_ticks > end_ticks);
+      }while (start_ticks > end_ticks);
 
       d = ticks_to_ns((end_ticks-last_ticks)-step_ticks);
       k = d/dint;
@@ -235,7 +235,7 @@ int main(int argc, char *argv[]) {
       start_ticks += step_ticks; 
       do {
         end_ticks = read_tsc();
-      while (start_ticks > end_ticks);
+      }while (start_ticks > end_ticks);
 
       nsloop(shift_ticks - (end_ticks - start_ticks));
       end_ticks = read_tsc();
