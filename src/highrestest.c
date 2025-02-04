@@ -22,13 +22,10 @@ http://www.gnu.org/licenses/gpl.txt for license details.
 //#define MYCLOCK CLOCK_MONOTONIC_RAW
 #define MYCLOCK CLOCK_MONOTONIC
 
-static inline unsigned long long read_tsc(void)
-{ unsigned long long tsc;
-  //_mm_lfence();
-  tsc = __rdtsc();
-  //_mm_lfence();
-  return (tsc);
-}
+long long tsc_freq_hz;
+long tsc_mult, tsc_shift;
+/* after calibration nsloop will take cnt ns */
+double nsloopfactor = 1.0;
 
 static long perf_event_open(struct perf_event_attr *hw_event, pid_t pid,
            int cpu, int group_fd, unsigned long flags)
@@ -36,33 +33,8 @@ static long perf_event_open(struct perf_event_attr *hw_event, pid_t pid,
     return syscall(__NR_perf_event_open, hw_event, pid, cpu, group_fd, flags);
 }
 
-/* t2 - t1 in nanoseconds */
-long difftimens(struct timespec t1, struct timespec t2)
-{ 
-   long long l1, l2;
-   l1 = t1.tv_sec*1000000000 + t1.tv_nsec;
-   l2 = t2.tv_sec*1000000000 + t2.tv_nsec;
-   return (long)(l2-l1);
-}
-
-/* after calibration nsloop will take cnt ns */
-double nsloopfactor = 1.0;
-
-static inline long  nsloop(long cnt) {
-  long i;
-  for (i = (long)(cnt*nsloopfactor); i > 0; i--) {
-    __asm volatile ("nop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\n");
-  }  
-  return i;
-}
-
-/* a simple test of the resolution of several CLOCKs */
-int main(int argc, char *argv[]) {
-  int ret, err, highresok, first, nloops, i, k, shift;
-  long multi, shifti, step, d, min, max, dev, dint, count[21];
-  struct timespec res, last, tim, ttime;
-  long long start_ticks, end_ticks, last_ticks;
-  long long tsc_freq_sec;
+long long get_tsc_freq(void)
+{
   struct perf_event_attr pe = {
       .type = PERF_TYPE_HARDWARE,
       .size = sizeof(struct perf_event_attr),
@@ -87,13 +59,61 @@ int main(int argc, char *argv[]) {
       return 1;
   }
   close(fd);
-  multi = pc->time_mult;
-  shifti = pc->time_shift;
-  tsc_freq_sec = 1000000000;
-  tsc_freq_sec <<= shifti;
-  tsc_freq_sec /= multi;
-  printf("tsc freq Hz: %lld\n", tsc_freq_sec); 
+  
+  __uint128_t x = 1000000000ull;
+  x <<= pc->time_shift;
+  x /= pc->time_mult;
+  return (x);
+}
 
+static inline unsigned long long read_tsc(void)
+{ unsigned long long tsc;
+  //_mm_lfence();
+  tsc = __rdtsc();
+  //_mm_lfence();
+  return (tsc);
+}
+
+long ticks_to_ns(long ticks)
+{ 
+    __uint128_t x = ticks;
+    x *= 1000000000ull;
+    x /= tsc_freq_hz;
+    return (x);
+}
+
+long ns_to_ticks(long ns)
+{
+    __uint128_t x = ns;
+    x *= tsc_freq_hz;
+    x /= 1000000000ull;
+    return (x);
+}	
+
+/* t2 - t1 in nanoseconds */
+long difftimens(struct timespec t1, struct timespec t2)
+{ 
+   long long l1, l2;
+   l1 = t1.tv_sec*1000000000 + t1.tv_nsec;
+   l2 = t2.tv_sec*1000000000 + t2.tv_nsec;
+   return (long)(l2-l1);
+}
+
+
+static inline long  nsloop(long cnt) {
+  long i;
+  for (i = (long)(cnt*nsloopfactor); i > 0; i--) {
+    __asm volatile ("nop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\n");
+  }  
+  return i;
+}
+
+/* a simple test of the resolution of several CLOCKs */
+int main(int argc, char *argv[]) {
+  int ret, err, highresok, first, nloops, i, k, shift;
+  long step, d, min, max, dev, dint, count[21];
+  struct timespec res, last, tim, ttime;
+  long long start_ticks, shift_ticks, end_ticks, last_ticks, step_ticks;
   
   if (argc == 2 && (strcmp(argv[1],"-h") == 0 || strcmp(argv[1],"--help") == 0)) {
      fprintf(stderr, "Usage: no argument - simple test\n  highresttest intv shift - with statistics\n  intv: interval, shift: delay for more precision\n\n");
@@ -104,7 +124,9 @@ int main(int argc, char *argv[]) {
 
   /* avoid waiting 50000 ns collecting more sleep requests */
   prctl(PR_SET_TIMERSLACK, 1L);
-
+ 
+  /* get tsc frequency */
+  tsc_freq_hz = get_tsc_freq();
   
   ret = clock_getres(CLOCK_REALTIME, &res);
   printf("realtime resolution: %ld s %ld ns (%d)\n", res.tv_sec, res.tv_nsec, ret); 
@@ -136,26 +158,26 @@ int main(int argc, char *argv[]) {
     min = 0;
     max = 0;
     dev =0;
-    end_ticks=(step*tsc_freq_sec/1000000000ull);
-    clock_gettime(MYCLOCK, &res);
-    start_ticks = __rdtsc();//read_tsc();
-    last = res;
+	// calculate ticks per step
+    step_ticks= ns_to_ticks(step);
     for(i=0; i<21; count[i]=0, i++);
+    start_ticks = __rdtsc();//read_tsc();
+    last_ticks = start_ticks;
+
     /* avoid some startup jitter */
     for(first=100, i=0; i < nloops+99; i++) 
     {
-      start_ticks += end_ticks; 
-      //do {
-      //  end_ticks = read_tsc();
-      while (start_ticks > __rdtsc());
+      start_ticks += step_ticks; 
+      do {
+        end_ticks = read_tsc();
+      while (start_ticks > end_ticks);
 
-      clock_gettime(MYCLOCK, &tim);
-      d = difftimens(last, tim)-step;
+      d = ticks_to_ns((end_ticks-last_ticks)-step_ticks);
       k = d/dint;
       if (k < -10) k = -10;
       if (k > 10) k = 10;
       count[k+10]++;
-      last = tim;
+      last_ticks = end_ticks;
 
       //printf("%ld\n", d);
       if (first == 0) {
@@ -184,10 +206,10 @@ int main(int argc, char *argv[]) {
     printf("Measuring actual precision with correction loops for 10 seconds ...\n");
 
     /* calibrate sleep loop */
-    clock_gettime(MYCLOCK, &res);
-    nsloop(10000);
-    clock_gettime(MYCLOCK, &ttime);
-    nsloopfactor = 1.0*10000/(difftimens(res, ttime));
+    start_ticks = __rdtsc();
+    nsloop(1000000);
+    end_ticks = read_tsc();
+    nsloopfactor = 1.0*1000000/(end_ticks-start_ticks);
     printf("nsloopfactor is %lf\n",nsloopfactor);
 
     step = 1000000;
@@ -197,34 +219,32 @@ int main(int argc, char *argv[]) {
       shift = atoi(argv[2]);
     if (shift <= 0)
       shift = 100000;
+    shift_ticks = ns_to_ticks(shift);
     min = 0;
     max = 0;
     dev =0;
+	// calculate ticks per step
+    step_ticks= ns_to_ticks(step);
     for(i=0; i<21; count[i]=0, i++);
-
-    clock_gettime(MYCLOCK, &res);
-    last = res;
+    start_ticks = __rdtsc();//read_tsc();
+    last_ticks = start_ticks;
     
     /* avoid some startup jitter */
     for(first=100, i=0; i < nloops+99; i++) 
     {
-      res.tv_nsec = res.tv_nsec+step;
-      if (res.tv_nsec > 999999999) {
-        res.tv_sec++;
-        res.tv_nsec -= 1000000000;
-      }
+      start_ticks += step_ticks; 
       do {
-        err = clock_nanosleep(MYCLOCK, TIMER_ABSTIME, &res, NULL);
-      } while (err !=0);
-      clock_gettime(MYCLOCK, &ttime);
-      nsloop(shift - difftimens(res, ttime));
-      clock_gettime(MYCLOCK, &tim);
-      d = difftimens(last, tim)-step;
+        end_ticks = read_tsc();
+      while (start_ticks > end_ticks);
+
+      nsloop(shift_ticks - (end_ticks - start_ticks));
+      end_ticks = read_tsc();
+      d = ticks_to_ns((end_ticks-last_ticks)-step_ticks);
       k = d/dint;
       if (k < -10) k = -10;
       if (k > 10) k = 10;
       count[k+10]++;
-      last = tim;
+      last_ticks = end_ticks;
 
       //printf("%ld\n", d);
       if (first == 0) {
