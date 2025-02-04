@@ -72,7 +72,7 @@ static inline unsigned long long read_tsc(void)
 { unsigned long long tsc;
   _mm_lfence();
   tsc = __rdtsc();
-  _mm_lfence();
+  //_mm_lfence();
   return (tsc);
 }
 
@@ -146,7 +146,7 @@ int main(int argc, char *argv[]) {
 	// calculate ticks per step
     step_ticks= ns_to_ticks(step);
     for(i=0; i<21; count[i]=0, i++);
-    start_ticks = read_tsc();
+    start_ticks = __rdtsc();
     last_ticks = start_ticks;
 
     /* avoid some startup jitter */
@@ -154,7 +154,7 @@ int main(int argc, char *argv[]) {
     {
       start_ticks += step_ticks; 
       do {
-        end_ticks = read_tsc();
+        end_ticks = __rdtsc();
       }while (start_ticks > end_ticks);
 
       d = (ticks_to_ns(end_ticks-last_ticks)-step);
