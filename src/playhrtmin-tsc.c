@@ -18,6 +18,7 @@ http://www.gnu.org/licenses/gpl.txt for license details.
 #include <unistd.h>
 #include <string.h>
 #include <time.h>
+#include <sys/mman.h>
 #include <alsa/asoundlib.h>
 #include "cprefresh.h"
 #include <linux/prctl.h>
