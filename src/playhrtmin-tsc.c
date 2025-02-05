@@ -107,14 +107,14 @@ long ns_to_ticks(long ns)
 
 int main(int argc, char *argv[])
 {
-    int sfd, s, moreinput, err, nrchannels, startcount, sumavg,
+    int sfd, s, nrchannels, startcount,
         stripped, innetbufsize, nrcp, slowcp, k;
-    long blen, hlen, ilen, olen, extra, loopspersec, sleep,
-         nsec, csec, count, wnext, avgav, checkav;
+    long blen, ilen, olen, extra, loopspersec, sleep,
+         nsec, csec, count;
     long long icount, ocount;
-    long long start_ticks, end_ticks, last_ticks, nsec_ticks, copy_ticks, c_ticks, sleep_ticks;
-    void *buf, *iptr, *optr, *tbuf, *max;
-    double looperr, off, extraerr, extrabps, morebps;
+    long long start_ticks, nsec_ticks, copy_ticks, csec_ticks, sleep_ticks;
+    void *buf, *iptr, *tbuf;
+    double looperr, extraerr, extrabps;
     snd_pcm_t *pcm_handle;
     snd_pcm_hw_params_t *hwparams;
     snd_pcm_sw_params_t *swparams;
@@ -316,7 +316,7 @@ int main(int argc, char *argv[])
 	
     if (slowcp){
 	    csec = nsec / (4*nrcp);
-        c_ticks = ns_to_ticks(csec);
+        csec_ticks = ns_to_ticks(csec);
 	}
     /* olen in frames written per loop */
     olen = rate/loopspersec;
@@ -338,12 +338,11 @@ int main(int argc, char *argv[])
     if (blen < 3*ilen) {
         blen = 3*ilen;
     }
-    hlen = blen/2;
+
     if (olen*loopspersec == rate)
         looperr = 0.0;
     else
         looperr = (1.0*rate)/loopspersec - 1.0*olen;
-    moreinput = 1;
     icount = 0;
     ocount = 0;
     /* for mmap try to set hwbuffer to multiple of output per loop */
@@ -357,10 +356,9 @@ int main(int argc, char *argv[])
     }
     /* we put some overlap before the reference pointer */
     buf = buf + (olen+extra)*bytesperframe;
-    max = buf + blen;
+
     /* the pointers for next input and next output */
     iptr = buf;
-    optr = buf;
 
     /**********************************************************************/
     /* setup network connection                                           */
@@ -508,11 +506,11 @@ int main(int argc, char *argv[])
           if (slowcp) {
               copy_ticks = start_ticks;
               for (k=nrcp; k; k--) {
-                  copy_ticks += c_ticks;
+                  copy_ticks += csec_ticks;
 				  while (copy_ticks > __rdtsc());
                   memclean((char*)tbuf, ilen);
                   cprefresh((char*)tbuf, (char*)iptr, ilen);
-                  copy_ticks += c_ticks;
+                  copy_ticks += csec_ticks;
 				  while (copy_ticks > __rdtsc());
                   memclean((char*)iptr, ilen);
                   cprefresh((char*)iptr, (char*)tbuf, ilen);
