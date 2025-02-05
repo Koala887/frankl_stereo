@@ -118,19 +118,17 @@ long ns_to_ticks(long ns)
 int main(int argc, char *argv[])
 {
     struct sockaddr_in serv_addr;
-    int listenfd, connfd, ifd, s, moreinput, optval=1, verbose, rate,
+    int listenfd, connfd, ifd, s, moreinput, optval=1, rate,
         bytesperframe, optc, interval, shared, innetbufsize, nrcp,
         outnetbufsize, dsync;
     long blen, hlen, ilen, olen, outpersec, loopspersec, nsec, count, wnext,
-         badreads, badreadbytes, badwrites, badwritebytes, lcount, 
-         dcount, dsyncfreq, fsize, e, a, outtime, outcopies, rambps, ramlps, 
-         ramtime, ramchunk, shift;
+         lcount, dcount, dsyncfreq, fsize, e, a, outtime, outcopies, rambps,
+		 ramlps, ramtime, ramchunk;
     long long icount, ocount;
     long long start_ticks, end_ticks, last_ticks, step_ticks;
     void *buf, *iptr, *optr, *max;
     char *port, *inhost, *inport, *outfile, *infile, *ptmp, *tbuf;
     void *obufs[1024];
-    struct timespec mtime, mtime1, ttime;
     double looperr, extraerr, extrabps, off, dsyncpersec;
     /* variables for shared memory input */
     char **fname, *fnames[100], **tmpname, *tmpnames[100], **mem, *mems[100],
@@ -208,8 +206,6 @@ int main(int argc, char *argv[])
     nrcp = 0;
     innetbufsize = 0;
     outnetbufsize = 0;
-    shift = 0;
-    verbose = 0;
     while ((optc = getopt_long(argc, argv, "p:o:b:i:D:n:m:X:Y:s:f:F:R:c:H:P:e:x:vVIhd",
             longoptions, &optind)) != -1) {
         switch (optc) {
@@ -295,14 +291,13 @@ int main(int argc, char *argv[])
               outnetbufsize = 128;
           break;
         case 'x':
-          shift = atoi(optarg);
+		  break;
         case 'O':
           break;   /* ignored */
         case 'I':
           interval = 1;
           break;
         case 'v':
-          verbose = 1;
           break;
         case 'V':
           fprintf(stderr,
@@ -460,14 +455,11 @@ int main(int argc, char *argv[])
 
     start_ticks = __rdtsc();
     /* main loop */
-    badreads = 0;
-    badwrites = 0;
-    badreadbytes = 0;
-    badwritebytes = 0;
+
     for (count=1, off=looperr; 1; count++, off+=looperr) {
         /* once cache is filled and other side is reading we reset time */
         if (count == 500) start_ticks = __rdtsc();
-        start_ticks += step_ticks;
+        start_ticks += nsec_ticks;
 
         refreshmem((char*)optr, wnext);
         while (start_ticks > __rdtsc());

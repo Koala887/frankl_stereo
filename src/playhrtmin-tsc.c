@@ -107,15 +107,13 @@ long ns_to_ticks(long ns)
 
 int main(int argc, char *argv[])
 {
-    int sfd, s, moreinput, err, verbose, nrchannels, startcount, sumavg,
-        stripped, innetbufsize, dobufstats, countdelay, maxbad, nrcp, slowcp, k;
-    long blen, hlen, ilen, olen, extra, loopspersec, nrdelays, sleep,
-         nsec, csec, count, wnext, badloops, badreads, readmissing, avgav, checkav;
-    long long icount, ocount, badframes;
-    long long start_ticks, end_ticks, last_ticks, step_ticks, copy_ticks, c_ticks;
+    int sfd, s, moreinput, err, nrchannels, startcount, sumavg,
+        stripped, innetbufsize, nrcp, slowcp, k;
+    long blen, hlen, ilen, olen, extra, loopspersec, sleep,
+         nsec, csec, count, wnext, avgav, checkav;
+    long long icount, ocount;
+    long long start_ticks, end_ticks, last_ticks, nsec_ticks, copy_ticks, c_ticks, sleep_ticks;
     void *buf, *iptr, *optr, *tbuf, *max;
-    struct timespec mtime, ctime;
-    struct timespec mtimecheck;
     double looperr, off, extraerr, extrabps, morebps;
     snd_pcm_t *pcm_handle;
     snd_pcm_hw_params_t *hwparams;
@@ -127,8 +125,6 @@ int main(int argc, char *argv[])
     snd_pcm_access_t access;
     snd_pcm_sframes_t avail;
     const snd_pcm_channel_area_t *areas;
-    double checktime;
-    long corr;
 
     /* read command line options */
     static struct option longoptions[] = {
@@ -189,14 +185,9 @@ int main(int argc, char *argv[])
     slowcp = 0;
     csec = 0;
     sleep = 0;
-    maxbad = 4;
     nonblock = 0;
     innetbufsize = 0;
-    corr = 0;
-    verbose = 0;
     stripped = 1;
-    dobufstats = 1;
-    countdelay = 1;
     while ((optc = getopt_long(argc, argv, "r:p:Sb:D:i:n:s:f:k:Mc:P:d:R:Ce:m:K:o:NXO:vyjVh",
             longoptions, &optind)) != -1) {
         switch (optc) {
@@ -270,7 +261,6 @@ int main(int argc, char *argv[])
           sleep = atoi(optarg);
           break;
         case 'm':
-          maxbad = atoi(optarg);
           break;
         case 'K':
           innetbufsize = atoi(optarg);
@@ -286,16 +276,13 @@ int main(int argc, char *argv[])
         case 'O':
           break;
         case 'v':
-          verbose += 1;
           break;
         case 'X':
           stripped = 1;
           break;
         case 'y':
-          dobufstats = 0;
           break;
         case 'j':
-          countdelay = 0;
           break;
         case 'V':
           fprintf(stderr,
@@ -325,7 +312,7 @@ int main(int argc, char *argv[])
     extraerr = extraerr/(extraerr+extrabps);
     nsec = (int) (1000000000*extraerr/loopspersec);
 	// calculate ticks per step
-    step_ticks= ns_to_ticks(nsec);
+    nsec_ticks= ns_to_ticks(nsec);
 	
     if (slowcp){
 	    csec = nsec / (4*nrcp);
@@ -451,15 +438,14 @@ int main(int argc, char *argv[])
     /**********************************************************************/
 
     /* get time */
-    if (clock_gettime(CLOCK_MONOTONIC, &mtime) < 0) {
-       	exit(19);
-    }
+	start_ticks = __rdtsc();
 
-    /* use defined sleep to allow input process to fill pipeline */
+    /* use defined sleep (us) to allow input process to fill pipeline */
     if (sleep > 0) {
-        mtime.tv_sec = sleep/1000000;
-        mtime.tv_nsec = 1000*(sleep - mtime.tv_sec*1000000);
-        nanosleep(&mtime, NULL);
+		sleep_ticks = ns_to_ticks(sleep*1000);
+		start_ticks += sleep_ticks;
+		while (start_ticks > __rdtsc());
+
     /* waits until pipeline is filled */
     } else {
         fd_set rdfs;
@@ -473,36 +459,24 @@ int main(int argc, char *argv[])
 
         /* now sleep until the pipeline is filled */
         sleep = (long)((fcntl(sfd, F_GETPIPE_SZ)/bytesperframe)*1000000.0/rate); /* us */
-        mtime.tv_sec = 0;
-        mtime.tv_nsec = sleep*1000;
-        nanosleep(&mtime, NULL);
+   		sleep_ticks = ns_to_ticks(sleep*1000);
+		start_ticks += sleep_ticks;
+		while (start_ticks > __rdtsc());
     }
 	
-    /* get time */
-    start_ticks = __rdtsc();
-    if (clock_gettime(CLOCK_MONOTONIC, &mtime) < 0) {
-       	exit(21);
-    }
-
     /**********************************************************************/
     /* main loop                                                          */
     /**********************************************************************/
     /* main loop */
-    badloops = 0;
-    badframes = 0;
-    badreads = 0;
-    readmissing = 0;
-    nrdelays = 0;
 
     if (access == SND_PCM_ACCESS_MMAP_INTERLEAVED && looperr == 0.0 &&
                stripped) {
      /* this is the same code as below, but with all verbosity, printf,
         offset and statistics code removed */
      startcount = hwbufsize/(2*olen);
+	 /* get time */
      start_ticks = __rdtsc();
-     //if (clock_gettime(CLOCK_MONOTONIC, &mtime) < 0) {
-     //     exit(19);
-     // }
+
       for (count=1; count <= startcount; count++) {
           /* start playing when half of hwbuffer is filled */
           if (count == startcount)  snd_pcm_start(pcm_handle);
@@ -514,15 +488,9 @@ int main(int argc, char *argv[])
           iptr = areas[0].addr + offset * bytesperframe;
           memclean(iptr, ilen);
           s = read(sfd, iptr, ilen);
-		  start_ticks += step_ticks;
-          //mtime.tv_nsec += nsec;
-          //if (mtime.tv_nsec > 999999999) {
-          //  mtime.tv_nsec -= 1000000000;
-          //  mtime.tv_sec++;
-          //}
+		  start_ticks += nsec_ticks;
           refreshmem(iptr, s);
 		  while (start_ticks > __rdtsc());
-          //clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &mtime, NULL);
           snd_pcm_mmap_commit(pcm_handle, offset, frames);
           icount += s;
           ocount += s;
@@ -539,27 +507,13 @@ int main(int argc, char *argv[])
           s = read(sfd, iptr, ilen);
           if (slowcp) {
               copy_ticks = start_ticks;
-			  //ctime.tv_nsec = mtime.tv_nsec;
-              //ctime.tv_sec = mtime.tv_sec;
               for (k=nrcp; k; k--) {
                   copy_ticks += c_ticks;
-				  //ctime.tv_nsec += csec;
-                  //if (ctime.tv_nsec > 999999999) {
-                  //  ctime.tv_nsec -= 1000000000;
-                  //  ctime.tv_sec++;
-                  //}
 				  while (copy_ticks > __rdtsc());
-                  //clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &ctime, NULL);
                   memclean((char*)tbuf, ilen);
                   cprefresh((char*)tbuf, (char*)iptr, ilen);
                   copy_ticks += c_ticks;
-				  //ctime.tv_nsec += csec;
-                  //if (ctime.tv_nsec > 999999999) {
-                  //  ctime.tv_nsec -= 1000000000;
-                  //  ctime.tv_sec++;
-                  //}
 				  while (copy_ticks > __rdtsc());
-                  //clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &ctime, NULL);
                   memclean((char*)iptr, ilen);
                   cprefresh((char*)iptr, (char*)tbuf, ilen);
               }
@@ -571,15 +525,10 @@ int main(int argc, char *argv[])
                   cprefresh((char*)iptr, (char*)tbuf, ilen);
               }
           }
-		  start_ticks += step_ticks;
-          //mtime.tv_nsec += nsec;
-          //if (mtime.tv_nsec > 999999999) {
-          //  mtime.tv_nsec -= 1000000000;
-          //  mtime.tv_sec++;
-          //}
+		  start_ticks += nsec_ticks;
+
           refreshmem(iptr, s);
 		  while (start_ticks > __rdtsc());
-          //clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &mtime, NULL);
           snd_pcm_mmap_commit(pcm_handle, offset, frames);
           icount += s;
           ocount += s;
