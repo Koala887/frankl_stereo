@@ -15,8 +15,8 @@ CFLAGSNO=-O0 -Wall -z execstack -D_FILE_OFFSET_BITS=64 -fgnu89-inline -DREFRESH$
 #ALL: bin tmp bin/volrace bin/bufhrt bin/bufhrtmin bin/highrestest \
 #     bin/writeloop bin/catloop bin/playhrt bin/playhrtmin bin/playhrtbuschel bin/cptoshm bin/shmcat \
 #     bin/resample_soxr bin/cat64 bin/shownfinfo bin/music2nf
-ALL: bin tmp bin/bufhrt bin/bufhrtmin bin/highrestest bin/highrestest-tsc \
-     bin/writeloop bin/catloop bin/playhrt bin/playhrtmin bin/playhrtbuschel
+ALL: bin tmp bin/bufhrt bin/bufhrtmin bin/bufhrtmin-tsc bin/highrestest bin/highrestest-tsc \
+     bin/writeloop bin/catloop bin/playhrt bin/playhrtmin bin/playhrtmin-tsc bin/playhrtbuschel
 
 bin:
 	mkdir -p bin
@@ -114,20 +114,27 @@ bin/by4: src/by4.c tmp/cprefresh.o tmp/cprefresh_ass.o |bin
 bin/playhrtmin: src/version.h tmp/net.o src/playhrtmin.c tmp/cprefresh.o tmp/cprefresh_ass.o |bin
 	$(CC) $(CFLAGSNO) -o bin/playhrtmin src/playhrtmin.c tmp/net.o tmp/cprefresh.o tmp/cprefresh_ass.o -lasound -lrt
 
+bin/playhrtmin-tsc: src/version.h tmp/net.o src/playhrtmin-tsc.c tmp/cprefresh.o tmp/cprefresh_ass.o |bin
+	$(CC) $(CFLAGSNO) -o bin/playhrtmin-tsc src/playhrtmin-tsc.c tmp/net.o tmp/cprefresh.o tmp/cprefresh_ass.o -lasound -lrt
+
 bin/playhrtbuschel: src/version.h tmp/net.o src/playhrtbuschel.c tmp/cprefresh.o tmp/cprefresh_ass.o |bin
 	$(CC) $(CFLAGSNO) -o bin/playhrtbuschel src/playhrtbuschel.c tmp/net.o tmp/cprefresh.o tmp/cprefresh_ass.o -lasound -lrt
 
 bin/bufhrtmin: src/version.h tmp/net.o src/bufhrtmin.c tmp/cprefresh.o tmp/cprefresh_ass.o |bin
-	$(CC) $(CFLAGSNO) -o bin/bufhrtmin tmp/net.o tmp/cprefresh.o tmp/cprefresh_ass.o src/bufhrtmin.c -lpthread -lrt
+	$(CC) $(CFLAGSNO) -o bin/bufhrtmin src/bufhrtmin.c tmp/net.o tmp/cprefresh.o tmp/cprefresh_ass.o -lpthread -lrt
+
+bin/bufhrtmin-tsc: src/version.h tmp/net.o src/bufhrtmin-tsc.c tmp/cprefresh.o tmp/cprefresh_ass.o |bin
+	$(CC) $(CFLAGSNO) -o bin/bufhrtmin-tsc src/bufhrtmin-tsc.c tmp/net.o tmp/cprefresh.o tmp/cprefresh_ass.o -lpthread -lrt
 
 clean: 
-	rm -rf src/version.h bin tmp
+	rm -rf src/version.h bin bin86 tmp
 
 veryclean: clean
 	rm -f *~ */*~ */*/*~
 
 # private, for bin in distribution
 bin86: 
+	make clean
 	make veryclean
 	make
 	mkdir -p bin86 ; \
