@@ -122,7 +122,7 @@ int main(int argc, char *argv[])
         outnetbufsize;
     long blen, hlen, ilen, olen, outpersec, loopspersec, nsec, count, wnext;
     long long icount, ocount;
-    long long start_ticks;
+    long long start_ticks, nsec_ticks;
     void *buf, *iptr, *optr, *max;
     char *port, *inhost, *inport, *outfile, *infile, *ptmp, *tbuf;
     void *obufs[1024];
@@ -327,7 +327,7 @@ int main(int argc, char *argv[])
     extraerr = 1.0*outpersec/(outpersec+extrabps);
     nsec = (int) (1000000000*extraerr/loopspersec);
 	// calculate ticks per step
-    step_ticks= ns_to_ticks(nsec);	
+    nsec_ticks= ns_to_ticks(nsec);	
     olen = outpersec/loopspersec;
     if (olen <= 0)
         olen = 1;
