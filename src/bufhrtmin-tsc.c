@@ -119,13 +119,12 @@ int main(int argc, char *argv[])
 {
     struct sockaddr_in serv_addr;
     int listenfd, connfd, ifd, s, moreinput, optval=1, rate,
-        bytesperframe, optc, interval, shared, innetbufsize, nrcp,
+        bytesperframe, optc, interval, innetbufsize, nrcp,
         outnetbufsize, dsync;
     long blen, hlen, ilen, olen, outpersec, loopspersec, nsec, count, wnext,
-         lcount, dcount, dsyncfreq, fsize, e, a, outtime, outcopies, rambps,
-		 ramlps, ramtime, ramchunk;
+         dsyncfreq;
     long long icount, ocount;
-    long long start_ticks, end_ticks, last_ticks, step_ticks;
+    long long start_ticks;
     void *buf, *iptr, *optr, *max;
     char *port, *inhost, *inport, *outfile, *infile, *ptmp, *tbuf;
     void *obufs[1024];
@@ -189,18 +188,11 @@ int main(int argc, char *argv[])
     ilen = 0;
     loopspersec = 1000;
     outpersec = 0;
-    ramlps = 0;
-    rambps = 0;
-    ramtime = 0;
-    ramchunk = 0;
-    outcopies = 0;
-    outtime = 0;
     rate = 0;
     bytesperframe = 0;
     inhost = NULL;
     inport = NULL;
     infile = NULL;
-    shared = 0;
     interval = 0;
     extrabps = 0.0;
     nrcp = 0;
@@ -231,10 +223,8 @@ int main(int argc, char *argv[])
           outpersec = atoi(optarg);
           break;
         case 'X':
-           ramlps = atoi(optarg);
            break;
         case 'Y':
-           rambps = atoi(optarg);
            break;
         case 's':
           rate = atoi(optarg);
@@ -244,8 +234,6 @@ int main(int argc, char *argv[])
           if (nrcp < 0 || nrcp > 1000) nrcp = 0;
           break;
         case 'c':
-          outcopies = atoi(optarg);
-          if (outcopies < 0 || outcopies > 1000) outcopies = 0;
           break;
         case 'f':
           if (strcmp(optarg, "S16_LE")==0) {
@@ -273,7 +261,6 @@ int main(int argc, char *argv[])
           ifd = 0;
           break;
         case 'M':
-          shared = 1;
           break;
         case 'e':
           extrabps = atof(optarg);
@@ -345,13 +332,6 @@ int main(int argc, char *argv[])
                 exit(23);
         }
     }
-    if (ramlps != 0 && rambps != 0) {
-        ramtime = 1000000000/(2*ramlps);
-        ramchunk = rambps/ramlps;
-        while (ramchunk % 16 != 0) ramchunk++;
-        if (ramchunk > TBUF) ramchunk = TBUF;
-    }
-
 
     extraerr = 1.0*outpersec/(outpersec+extrabps);
     nsec = (int) (1000000000*extraerr/loopspersec);
@@ -392,16 +372,6 @@ int main(int argc, char *argv[])
     iptr = buf;
     optr = buf;
 
-    /* buffers for loop of output copies */
-    if (outcopies > 0) {
-        /* spend half of loop duration with copies of output chunk */
-        outtime = nsec/(8*outcopies);
-        for (i=1; i < outcopies; i++) {
-            if (posix_memalign(obufs+i, 4096, 2*olen)) {
-                exit(20);
-            }
-        }
-    }
 
     /* outgoing socket */
     if (port != 0) {

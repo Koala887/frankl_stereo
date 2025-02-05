@@ -366,7 +366,7 @@ int main(int argc, char *argv[])
     long blen, hlen, ilen, olen, extra, loopspersec, nrdelays, sleep,
          nsec, csec, count, wnext, badloops, badreads, readmissing, avgav, checkav;
     long long icount, ocount, badframes;
-    long long start_ticks, end_ticks, last_ticks, nsec_ticks, copy_ticks, c_ticks, sleep_ticks;
+    long long start_ticks, end_ticks, last_ticks, nsec_ticks, copy_ticks, csec_ticks, sleep_ticks;
     void *buf, *iptr, *optr, *tbuf, *max;
     struct timespec mtime, ctime;
     struct timespec mtimecheck;
@@ -588,7 +588,7 @@ int main(int argc, char *argv[])
 	
     if (slowcp){
 	    csec = nsec / (4*nrcp);
-        c_ticks = ns_to_ticks(csec);
+        csec_ticks = ns_to_ticks(csec);
 	}
     if (verbose) {
         fprintf(stderr, "playhrt: Step size is %ld nsec.\n", nsec);
@@ -917,7 +917,6 @@ int main(int argc, char *argv[])
           iptr = areas[0].addr + offset * bytesperframe;
           memclean(iptr, ilen);
           s = read(sfd, iptr, ilen);
-          mtime.tv_nsec += nsec;
 		  start_ticks += nsec_ticks;
           refreshmem(iptr, s);
 		  while (start_ticks > __rdtsc());
@@ -938,12 +937,11 @@ int main(int argc, char *argv[])
           if (slowcp) {
               copy_ticks = start_ticks;
               for (k=nrcp; k; k--) {
-                  ctime.tv_nsec += csec;
-                  copy_ticks += c_ticks;
+                  copy_ticks += csec_ticks;
 				  while (copy_ticks > __rdtsc());
                   memclean((char*)tbuf, ilen);
                   cprefresh((char*)tbuf, (char*)iptr, ilen);
-                  copy_ticks += c_ticks;
+                  copy_ticks += csec_ticks;
 				  while (copy_ticks > __rdtsc());
                   memclean((char*)iptr, ilen);
                   cprefresh((char*)iptr, (char*)tbuf, ilen);
@@ -992,11 +990,11 @@ int main(int argc, char *argv[])
               copy_ticks = start_ticks;
               for (k=nrcp; k; k--) {
                   ctime.tv_nsec += csec;
-                  copy_ticks += c_ticks;
+                  copy_ticks += csec_ticks;
 				  while (copy_ticks > __rdtsc());
                   memclean((char*)tbuf, ilen);
                   cprefresh((char*)tbuf, (char*)iptr, ilen);
-                  copy_ticks += c_ticks;
+                  copy_ticks += csec_ticks;
 				  while (copy_ticks > __rdtsc());
                   memclean((char*)iptr, ilen);
                   cprefresh((char*)iptr, (char*)tbuf, ilen);
