@@ -124,13 +124,10 @@ int main(int argc, char *argv[])
     long long icount, ocount;
     long long start_ticks, nsec_ticks;
     void *buf, *iptr, *optr, *max;
-    char *port, *inhost, *inport, *outfile, *infile, *ptmp, *tbuf;
-    void *obufs[1024];
+    char *port, *inhost, *inport, *outfile, *infile;
     double looperr, extraerr, extrabps, off;
     /* variables for shared memory input */
          
-    int i, k, flen, size, c, sz;
-    struct stat sb;
 
     /* read command line options */
     static struct option longoptions[] = {
