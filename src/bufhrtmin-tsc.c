@@ -93,7 +93,7 @@ static inline unsigned long long read_tsc(void)
 { unsigned long long tsc;
   _mm_lfence();
   tsc = __rdtsc();
-  //_mm_lfence();
+  _mm_lfence();
   return (tsc);
 }
 
@@ -411,16 +411,16 @@ int main(int argc, char *argv[])
     else
         wnext = olen;
 
-    start_ticks = __rdtsc();
+    start_ticks = read_tsc();
     /* main loop */
 
     for (count=1, off=looperr; 1; count++, off+=looperr) {
         /* once cache is filled and other side is reading we reset time */
-        if (count == 500) start_ticks = __rdtsc();
+        if (count == 500) start_ticks = read_tsc();
         start_ticks += nsec_ticks;
 
         refreshmem((char*)optr, wnext);
-        while (start_ticks > __rdtsc());
+        while (start_ticks > read_tsc());
         /* write a chunk, this comes first after waking from sleep */
         s = write(connfd, optr, wnext);
         if (s < 0) {

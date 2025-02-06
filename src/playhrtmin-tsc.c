@@ -86,7 +86,7 @@ static inline unsigned long long read_tsc(void)
 { unsigned long long tsc;
   _mm_lfence();
   tsc = __rdtsc();
-  //_mm_lfence();
+  _mm_lfence();
   return (tsc);
 }
 
@@ -437,13 +437,13 @@ int main(int argc, char *argv[])
     /**********************************************************************/
 
     /* get time */
-	start_ticks = __rdtsc();
+	start_ticks = read_tsc();
 
     /* use defined sleep (us) to allow input process to fill pipeline */
     if (sleep > 0) {
 		sleep_ticks = ns_to_ticks(sleep*1000);
 		start_ticks += sleep_ticks;
-		while (start_ticks > __rdtsc());
+		while (start_ticks > read_tsc());
 
     /* waits until pipeline is filled */
     } else {
@@ -460,7 +460,7 @@ int main(int argc, char *argv[])
         sleep = (long)((fcntl(sfd, F_GETPIPE_SZ)/bytesperframe)*1000000.0/rate); /* us */
    		sleep_ticks = ns_to_ticks(sleep*1000);
 		start_ticks += sleep_ticks;
-		while (start_ticks > __rdtsc());
+		while (start_ticks > read_tsc());
     }
 	
     /**********************************************************************/
@@ -474,7 +474,7 @@ int main(int argc, char *argv[])
         offset and statistics code removed */
      startcount = hwbufsize/(2*olen);
 	 /* get time */
-     start_ticks = __rdtsc();
+     start_ticks = read_tsc();
 
       for (count=1; count <= startcount; count++) {
           /* start playing when half of hwbuffer is filled */
@@ -489,7 +489,7 @@ int main(int argc, char *argv[])
           s = read(sfd, iptr, ilen);
 		  start_ticks += nsec_ticks;
           refreshmem(iptr, s);
-		  while (start_ticks > __rdtsc());
+		  while (start_ticks > read_tsc());
           snd_pcm_mmap_commit(pcm_handle, offset, frames);
           icount += s;
           ocount += s;
@@ -508,11 +508,11 @@ int main(int argc, char *argv[])
               copy_ticks = start_ticks;
               for (k=nrcp; k; k--) {
                   copy_ticks += csec_ticks;
-				  while (copy_ticks > __rdtsc());
+				  while (copy_ticks > read_tsc());
                   memclean((char*)tbuf, ilen);
                   cprefresh((char*)tbuf, (char*)iptr, ilen);
                   copy_ticks += csec_ticks;
-				  while (copy_ticks > __rdtsc());
+				  while (copy_ticks > read_tsc());
                   memclean((char*)iptr, ilen);
                   cprefresh((char*)iptr, (char*)tbuf, ilen);
               }
@@ -527,7 +527,7 @@ int main(int argc, char *argv[])
 		  start_ticks += nsec_ticks;
 
           refreshmem(iptr, s);
-		  while (start_ticks > __rdtsc());
+		  while (start_ticks > read_tsc());
           snd_pcm_mmap_commit(pcm_handle, offset, frames);
           icount += s;
           ocount += s;
