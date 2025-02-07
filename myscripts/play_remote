@@ -13,45 +13,69 @@ EXTRABYTESPLAY=0
 
 #VERBOSE="--verbose --verbose"
 AUDIOCOMPUTER=192.168.10.2
-SAMPLERATE=44100
-SAMPLEFORMAT=S32_LE
-# this is 192000 * 4 * 2 (32 bit samples, 2 channels)
-BYTESPERSECOND=352800
-BRUTEFIRCONFIG="<path to your brutefir config>"
 HOST=192.168.10.1
 PORT=5570
+SAMPLERATE=44100
+BITLENGTH=32
+SAMPLEFORMAT=S32_LE
 
-# find input sample rate
-ORIGRATE=`sox --i "$1" | grep "Sample Rate" | cut -d: -f2 | sed -e "s/ //g"`
-echo ${ORIGRATE}
-ENDING=${1##*.}
 trap "trap - SIGTERM && kill -- -$$ " SIGINT SIGTERM EXIT
+# find input sample rate
+SAMPLERATE=`sox --i "$1" | grep "Sample Rate" | cut -d: -f2 | sed -e "s/ //g"`
 
-cptoshm --file="$1" --shmname=/play.flac
+if [ "${SAMPLERATE}" = "96000" ]; then
+  LOOPSPERSECOND=1500
+  HW_BUFFER=4096
+  EXTRABYTESPLAY=0
+  BYTESPERSECOND=768000
 
-rm -f /dev/shm/bl{1,2,3} /dev/shm/sem.bl{1,2,3}* 
+elif [ "${SAMPLERATE}" = "48000" ]; then
+  LOOPSPERSECOND=1500
+  HW_BUFFER=2048
+  EXTRABYTESPLAY=0
+  BYTESPERSECOND=384000
 
-shmcat --shmname=/play.flac |
-taskset -c 0 sox -t ${ENDING} - -t raw -r ${ORIGRATE} -c 2 -e signed -b 32 - | \
-taskset -c 0 writeloop --block-size=6720 --file-size=40320 --shared /bl1 /bl2 /bl3 &
+elif [ "${SAMPLERATE}" = "88200" ]; then
+  LOOPSPERSECOND=1050
+  HW_BUFFER=4032
+  EXTRABYTESPLAY=0
+  BYTESPERSECOND=705600
 
-sleep 0.2
+elif [ "${SAMPLERATE}" = "44100" ]; then
+  LOOPSPERSECOND=1050
+  HW_BUFFER=7680
+  EXTRABYTESPLAY=0
+  BYTESPERSECOND=352800
+
+elif [ "${SAMPLERATE}" = "192000" ]; then
+  LOOPSPERSECOND=1500
+  HW_BUFFER=8192
+  EXTRABYTESPLAY=0
+  BYTESPERSECOND=1536000
+fi
+
+cpupower frequency-set -u 3400MHz
+
+#echo ${ORIGRATE}
+#ENDING=${1##*.}
+
+sox "$1" -t raw -e signed -b 32 /dev/shm/play.raw
+
+cpupower frequency-set -u 800MHz -d 800MHz
 
 # tell audio computer what to do, short sleep as startup time for sender
 REMOTE="sleep 0.3;\
-        taskset -c 3 chrt -f 95 playhrtmin --stripped ${VERBOSE} --host=${HOST} --port=${PORT} \
+        taskset -c 3 chrt -f 90 playhrtmin --stripped ${VERBOSE} --host=${HOST} --port=${PORT} \
                      --sample-rate=${SAMPLERATE} \
                      --sample-format=${SAMPLEFORMAT} \
-                     --loops-per-second=1050 --number-copies=2 --slow-copies \
-                     --device=${CARD} --hw-buffer=1920 \
+                     --loops-per-second=${LOOPSPERSECOND} --number-copies=2 --slow-copies \
+                     --device=${CARD} --hw-buffer=${HW_BUFFER} \
                      --extra-bytes-per-second=${EXTRABYTESPLAY} \
                      --non-blocking-write --mmap" #--in-net-buffer-size=67200"
 
 echo "${REMOTE}" |  nc -q 0 ${AUDIOCOMPUTER} 5501 
 
-# instead of
-taskset -c 1 catloop --block-size=6720 --shared /bl1 /bl2 /bl3 | \
-taskset -c 1 chrt -f 95 bufhrt --bytes-per-second=${BYTESPERSECOND} \
-       --loops-per-second=1050 --port-to-write=${PORT} \
+taskset -c 3 chrt -f 90 bufhrtmin --file=/dev/shm/play.raw --bytes-per-second=${BYTESPERSECOND} \
+       --loops-per-second=10${LOOPSPERSECOND} --port-to-write=${PORT} \
        --extra-bytes-per-second=${EXTRABYTESBUF} \
        ${VERBOSE} #--out-net-buffer-size=67200

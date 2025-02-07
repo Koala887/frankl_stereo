@@ -63,7 +63,7 @@ cpupower frequency-set -u 800MHz -d 800MHz >/dev/null 2>&1
 
 # tell audio computer what to do, short sleep as startup time for sender
 REMOTE="sleep 0.3;\
-        chrt -f 90 taskset -c 3 playhrtmin --host=${HOST} --port=${PORT} \
+        taskset -c 3 playhrtmin-tsc --host=${HOST} --port=${PORT} \
                      --sample-rate=${SAMPLERATE} \
                      --sample-format=${SAMPLEFORMAT} \
                      --loops-per-second=${LOOPSPERSECOND} --number-copies=2 --slow-copies \
@@ -73,7 +73,7 @@ REMOTE="sleep 0.3;\
 
 echo "${REMOTE}" |  nc -q 0 ${AUDIOCOMPUTER} 5501 
 
-taskset -c 3 chrt -f 90 bufhrtmin --file=/dev/shm/play.raw --bytes-per-second=${BYTESPERSECOND} \
+taskset -c 3 bufhrtmin-tsc --file=/dev/shm/play.raw --bytes-per-second=${BYTESPERSECOND} \
        --loops-per-second=${LOOPSPERSECOND} --port-to-write=${PORT} \
        --extra-bytes-per-second=${EXTRABYTESBUF} \
        ${VERBOSE} #--out-net-buffer-size=67200

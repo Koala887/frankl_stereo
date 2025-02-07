@@ -161,14 +161,15 @@ int main(int argc, char *argv[]) {
       nsloop(shift - difftimens(res, ttime));
       clock_gettime(MYCLOCK, &tim);
       d = difftimens(last, tim)-step;
-      k = d/dint;
-      if (k < -10) k = -10;
-      if (k > 10) k = 10;
-      count[k+10]++;
+
       last = tim;
 
       //printf("%ld\n", d);
       if (first == 0) {
+        k = d/dint;
+        if (k < -10) k = -10;
+        if (k > 10) k = 10;
+        count[k+10]++;
         if (d < min)
            min = d;
         if (d > max)

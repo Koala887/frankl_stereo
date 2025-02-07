@@ -1,29 +1,27 @@
-#!/bin/bash
+#!/bin/bash 
 
 #########################################################################
-##  frankl (C) 2015              playfrommpdremote
+##  frankl (C) 2015              play_remote
 ##
 ##  See README or http://frank_l.bitbucket.org/stereoutils/player.html
 ##  for explanations.
 #########################################################################
-#!/bin/bash
-#rm -f /dev/shm/play.raw
-#wget $3 -qO /dev/shm/play.wav &
+
 CARD="hw:0,0"
 EXTRABYTESBUF=0
+EXTRABYTESPLAY=0
+
+#VERBOSE="--verbose --verbose"
 AUDIOCOMPUTER=192.168.10.2
 HOST=192.168.10.1
 PORT=5570
-#VERBOSE="--verbose --verbose"
-SAMPLERATE=$1
-BITLENGTH=$2
+SAMPLERATE=44100
 BITLENGTH=32
 SAMPLEFORMAT=S32_LE
 
-FILENAME=`echo "$3" | sed -e "s\.*musik\/mnt/media/musik\g;s/*20/ /g"` 
-
-echo $3
-echo "File name is ${FILENAME}"
+trap "trap - SIGTERM && kill -- -$$ " SIGINT SIGTERM EXIT
+# find input sample rate
+SAMPLERATE=`sox --i "$1" | grep "Sample Rate" | cut -d: -f2 | sed -e "s/ //g"`
 
 if [ "${SAMPLERATE}" = "96000" ]; then
   LOOPSPERSECOND=1500
@@ -56,31 +54,28 @@ elif [ "${SAMPLERATE}" = "192000" ]; then
   BYTESPERSECOND=1536000
 fi
 
-trap "trap - SIGTERM && kill -- -$$ " SIGINT SIGTERM EXIT
+cpupower frequency-set -u 3400MHz
 
-cpupower frequency-set -u 3400MHz >/dev/null 2>&1
-sox "$3" -t raw -e signed -b 32 /dev/shm/play.raw
-cpupower frequency-set -u 800MHz -d 800MHz >/dev/null 2>&1
+#echo ${ORIGRATE}
+#ENDING=${1##*.}
+
+sox "$1" -t raw -e signed -b 32 /dev/shm/play.raw
+
+cpupower frequency-set -u 800MHz -d 800MHz
 
 # tell audio computer what to do, short sleep as startup time for sender
 REMOTE="sleep 0.3;\
-        chrt -f 90 taskset -c 3 playhrtmin --host=${HOST} --port=${PORT} \
+        taskset -c 3 playhrtmin-tsc --stripped ${VERBOSE} --host=${HOST} --port=${PORT} \
                      --sample-rate=${SAMPLERATE} \
                      --sample-format=${SAMPLEFORMAT} \
                      --loops-per-second=${LOOPSPERSECOND} --number-copies=2 --slow-copies \
                      --device=${CARD} --hw-buffer=${HW_BUFFER} \
                      --extra-bytes-per-second=${EXTRABYTESPLAY} \
-                     --non-blocking-write --mmap"
+                     --non-blocking-write --mmap" #--in-net-buffer-size=67200"
 
 echo "${REMOTE}" |  nc -q 0 ${AUDIOCOMPUTER} 5501 
 
-taskset -c 1 chrt -f 90 bufhrtmin --file=/dev/shm/play.raw --bytes-per-second=${BYTESPERSECOND} \
-       --loops-per-second=${LOOPSPERSECOND} --port-to-write=${PORT} \
+taskset -c 3 bufhrtmin-tsc --file=/dev/shm/play.raw --bytes-per-second=${BYTESPERSECOND} \
+       --loops-per-second=10${LOOPSPERSECOND} --port-to-write=${PORT} \
        --extra-bytes-per-second=${EXTRABYTESBUF} \
        ${VERBOSE} #--out-net-buffer-size=67200
-
-#taskset -c 3 catloop --block-size=${BLOCKSIZE} --shared /bl1 /bl2 /bl3 | \
-#chrt -f 90 taskset -c 3 bufhrtmin --bytes-per-second=${BYTESPERSECOND} \
-#                               --loops-per-second=$[${LOOPSPERSECOND}*2] --port-to-write=${PORT} \
-#                               --extra-bytes-per-second=${EXTRABYTESBUF} ${VERBOSE} 
-

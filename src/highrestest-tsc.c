@@ -140,14 +140,15 @@ int main(int argc, char *argv[]) {
       }while (start_ticks > end_ticks);
 
       d = (ticks_to_ns(end_ticks-last_ticks)-step);
-      k = d/dint;
-      if (k < -10) k = -10;
-      if (k > 10) k = 10;
-      count[k+10]++;
+
       last_ticks = end_ticks;
 
       //printf("%ld\n", d);
       if (first == 0) {
+        k = d/dint;
+        if (k < -10) k = -10;
+        if (k > 10) k = 10;
+        count[k+10]++;
         if (d < min)
            min = d;
         if (d > max)
