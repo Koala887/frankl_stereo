@@ -136,7 +136,7 @@ int main(int argc, char *argv[]) {
     {
       start_ticks += step_ticks; 
       do {
-        end_ticks = read_tsc();
+        end_ticks = __rdtsc();
       }while (start_ticks > end_ticks);
 
       d = (ticks_to_ns(end_ticks-last_ticks)-step);

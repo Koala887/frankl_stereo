@@ -420,7 +420,7 @@ int main(int argc, char *argv[])
         start_ticks += nsec_ticks;
 
         refreshmem((char*)optr, wnext);
-        while (start_ticks > read_tsc());
+        while (start_ticks > __rdtsc());
         /* write a chunk, this comes first after waking from sleep */
         s = write(connfd, optr, wnext);
         if (s < 0) {

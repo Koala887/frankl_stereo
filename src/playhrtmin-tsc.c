@@ -443,7 +443,7 @@ int main(int argc, char *argv[])
     if (sleep > 0) {
 		sleep_ticks = ns_to_ticks(sleep*1000);
 		start_ticks += sleep_ticks;
-		while (start_ticks > read_tsc());
+		while (start_ticks > __rdtsc());
 
     /* waits until pipeline is filled */
     } else {
@@ -460,7 +460,7 @@ int main(int argc, char *argv[])
         sleep = (long)((fcntl(sfd, F_GETPIPE_SZ)/bytesperframe)*1000000.0/rate); /* us */
    		sleep_ticks = ns_to_ticks(sleep*1000);
 		start_ticks += sleep_ticks;
-		while (start_ticks > read_tsc());
+		while (start_ticks > __rdtsc());
     }
 	
     /**********************************************************************/
@@ -487,9 +487,9 @@ int main(int argc, char *argv[])
           iptr = areas[0].addr + offset * bytesperframe;
           memclean(iptr, ilen);
           s = read(sfd, iptr, ilen);
-		  start_ticks += nsec_ticks;
+		      start_ticks += nsec_ticks;
           refreshmem(iptr, s);
-		  while (start_ticks > read_tsc());
+		      while (start_ticks > __rdtsc());
           snd_pcm_mmap_commit(pcm_handle, offset, frames);
           icount += s;
           ocount += s;
@@ -508,11 +508,11 @@ int main(int argc, char *argv[])
               copy_ticks = start_ticks;
               for (k=nrcp; k; k--) {
                   copy_ticks += csec_ticks;
-				  while (copy_ticks > read_tsc());
+				          while (copy_ticks > __rdtsc());
                   memclean((char*)tbuf, ilen);
                   cprefresh((char*)tbuf, (char*)iptr, ilen);
                   copy_ticks += csec_ticks;
-				  while (copy_ticks > read_tsc());
+				          while (copy_ticks > __rdtsc());
                   memclean((char*)iptr, ilen);
                   cprefresh((char*)iptr, (char*)tbuf, ilen);
               }
@@ -527,7 +527,7 @@ int main(int argc, char *argv[])
 		  start_ticks += nsec_ticks;
 
           refreshmem(iptr, s);
-		  while (start_ticks > read_tsc());
+		      while (start_ticks > __rdtsc());
           snd_pcm_mmap_commit(pcm_handle, offset, frames);
           icount += s;
           ocount += s;
