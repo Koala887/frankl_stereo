@@ -18,6 +18,7 @@ http://www.gnu.org/licenses/gpl.txt for license details.
 #include <sys/prctl.h>
 #include <emmintrin.h> 
 #include <x86intrin.h>
+#include <x86gprintrin.h>
 
 long long tsc_freq_hz;
 
@@ -68,6 +69,18 @@ static inline unsigned long long read_tsc(void)
   tsc = __rdtsc();
   _mm_lfence();
   return (tsc);
+}
+
+static inline int tpause(long long tsc, long long step) {
+  int i, loops;
+  loops = step / 100000;
+
+  for (i = 1; i < loops; i++)
+  {
+    _tpause(1,(tsc + (i * step / loops)));
+  }
+  _tpause(0,tsc + step);
+  return (0);
 }
 
 long ticks_to_ns(long ticks)
@@ -134,6 +147,7 @@ int main(int argc, char *argv[]) {
     /* avoid some startup jitter */
     for(first=100, i=0; i < nloops+99; i++) 
     {
+      tpause(start_ticks, step_ticks-1000);
       start_ticks += step_ticks; 
       do {
         end_ticks = __rdtsc();

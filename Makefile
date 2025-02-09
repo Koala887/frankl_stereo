@@ -9,7 +9,7 @@ ARCH=$(shell uname -m)
 CFLAGS=-O2 -Wall -z execstack -D_FILE_OFFSET_BITS=64 -fgnu89-inline -DREFRESH$(REFRESH)
 
 # CFLAGS without optimization
-CFLAGSNO=-O0 -Wall -z execstack -D_FILE_OFFSET_BITS=64 -fgnu89-inline -DREFRESH$(REFRESH)
+CFLAGSNO=-O0 -Wall -z execstack -D_FILE_OFFSET_BITS=64 -fgnu89-inline -mwaitpkg -DREFRESH$(REFRESH)
 
 # targets
 #ALL: bin tmp bin/volrace bin/bufhrt bin/bufhrtmin bin/highrestest \
