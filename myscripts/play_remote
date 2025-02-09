@@ -76,6 +76,6 @@ REMOTE="sleep 0.3;\
 echo "${REMOTE}" |  nc -q 0 ${AUDIOCOMPUTER} 5501 
 
 taskset -c 3 chrt -f 90 bufhrtmin --file=/dev/shm/play.raw --bytes-per-second=${BYTESPERSECOND} \
-       --loops-per-second=10${LOOPSPERSECOND} --port-to-write=${PORT} \
+       --loops-per-second=${LOOPSPERSECOND} --port-to-write=${PORT} \
        --extra-bytes-per-second=${EXTRABYTESBUF} \
        ${VERBOSE} #--out-net-buffer-size=67200
