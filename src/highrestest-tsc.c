@@ -73,11 +73,12 @@ static inline unsigned long long read_tsc(void)
 
 static inline int tpause(long long tsc, long long step) {
   int i, loops;
-  loops = step / 100000;
-
+  long sleep;
+  loops = (step / 100000) + 1;
+  sleep = (step / (loops)
   for (i = 1; i < loops; i++)
   {
-    _tpause(1,(tsc + (i * step / loops)));
+    _tpause(1,(tsc + (i * sleep)));
   }
   _tpause(0,tsc + step);
   return (0);
