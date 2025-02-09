@@ -75,7 +75,7 @@ static inline int tpause(long long tsc, long long step) {
   int i, loops;
   long sleep;
   loops = (step / 100000) + 1;
-  sleep = (step / (loops)
+  sleep = (step / loops);
   for (i = 1; i < loops; i++)
   {
     _tpause(1,(tsc + (i * sleep)));
@@ -148,7 +148,7 @@ int main(int argc, char *argv[]) {
     /* avoid some startup jitter */
     for(first=100, i=0; i < nloops+99; i++) 
     {
-      tpause(start_ticks, step_ticks-1000);
+      tpause(start_ticks, step_ticks-500);
       start_ticks += step_ticks; 
       do {
         end_ticks = __rdtsc();
