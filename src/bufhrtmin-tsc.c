@@ -29,6 +29,7 @@ http://www.gnu.org/licenses/gpl.txt for license details.
 #include "cprefresh.h"
 #include <emmintrin.h> 
 #include <x86intrin.h>
+#include <x86gprintrin.h>
 #include <linux/perf_event.h>
 #include <asm/unistd.h>
 #include <inttypes.h>
@@ -42,12 +43,6 @@ static long perf_event_open(struct perf_event_attr *hw_event, pid_t pid,
     return syscall(__NR_perf_event_open, hw_event, pid, cpu, group_fd, flags);
 }
 
-
-/* help page */
-/* vim hint to remove resp. add quotes:
-      s/^"\(.*\)\\n"$/\1/
-      s/.*$/"\0\\n"/
-*/
 void usage( ) {
   fprintf(stderr,
           "bufhrt (version %s of frankl's stereo utilities)\nUSAGE:\n",
@@ -79,8 +74,6 @@ long long get_tsc_freq(void)
       fprintf(stderr, "Perf system doesn't support user time\n");
       return 1;
   }
-  //printf("TSC-Mult: %u \n", pc->time_mult);
-  //printf("TSC-Shift: %u \n", pc->time_shift);
   close(fd);
   
   __uint128_t x = 1000000000ull;
@@ -95,6 +88,19 @@ static inline unsigned long long read_tsc(void)
   tsc = __rdtsc();
   _mm_lfence();
   return (tsc);
+}
+
+static inline int tpause(long long tsc, long long step) {
+  int i, loops;
+  long sleep;
+  loops = (step / 100000) + 1;
+  sleep = (step / loops);
+  for (i = 1; i < loops; i++)
+  {
+    _tpause(1,(tsc + (i * sleep)));
+  }
+  _tpause(0,tsc + step);
+  return (0);
 }
 
 long ticks_to_ns(long ticks)
@@ -119,10 +125,10 @@ int main(int argc, char *argv[])
     struct sockaddr_in serv_addr;
     int listenfd, connfd, ifd, s, moreinput, optval=1, rate,
         bytesperframe, optc, interval, innetbufsize, nrcp,
-        outnetbufsize;
+        outnetbufsize, shift;
     long blen, hlen, ilen, olen, outpersec, loopspersec, nsec, count, wnext;
     long long icount, ocount;
-    long long start_ticks, nsec_ticks;
+    long long start_ticks, last_ticks, nsec_ticks;
     void *buf, *iptr, *optr, *max;
     char *port, *inhost, *inport, *outfile, *infile;
     double looperr, extraerr, extrabps, off;
@@ -189,6 +195,7 @@ int main(int argc, char *argv[])
     nrcp = 0;
     innetbufsize = 0;
     outnetbufsize = 0;
+    shift = 100;
     while ((optc = getopt_long(argc, argv, "p:o:b:i:D:n:m:X:Y:s:f:F:R:c:H:P:e:x:vVIhd",
             longoptions, &optind)) != -1) {
         switch (optc) {
@@ -268,7 +275,8 @@ int main(int argc, char *argv[])
               outnetbufsize = 128;
           break;
         case 'x':
-		  break;
+          shift = atoi(optarg);
+          break;
         case 'O':
           break;   /* ignored */
         case 'I':
@@ -415,18 +423,16 @@ int main(int argc, char *argv[])
     /* main loop */
 
     for (count=1, off=looperr; 1; count++, off+=looperr) {
-        /* once cache is filled and other side is reading we reset time */
-        if (count == 500) start_ticks = read_tsc();
+        last_ticks = start_ticks;
         start_ticks += nsec_ticks;
-
         refreshmem((char*)optr, wnext);
+        tpause(last_ticks, nsec_ticks-shift);
         while (start_ticks > __rdtsc());
         /* write a chunk, this comes first after waking from sleep */
         s = write(connfd, optr, wnext);
         if (s < 0) {
             exit(15);
         }
-
         ocount += s;
         optr += s;
         wnext = olen + wnext - s;

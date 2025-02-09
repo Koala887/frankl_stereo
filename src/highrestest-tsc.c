@@ -102,7 +102,7 @@ long ns_to_ticks(long ns)
 
 /* a simple test of the resolution of several CLOCKs */
 int main(int argc, char *argv[]) {
-  int ret, highresok, first, nloops, i, k;
+  int ret, highresok, first, nloops, i, k, shift;
   long step, d, min, max, dev, dint, count[21];
   struct timespec res, tim;
   long long start_ticks, end_ticks, last_ticks, step_ticks;
@@ -133,6 +133,11 @@ int main(int argc, char *argv[]) {
     printf("Measuring actual precision of rdtsc() for 10 seconds ...\n");
     step = 1000000;
     nloops = 10000;
+    shift = 100;
+    if (argc > 2) 
+      shift = atoi(argv[2]);
+    if (shift <= 0)
+      shift = 100;
     dint = atoi(argv[1]);
     if (dint <= 0)
       dint = 500;
@@ -148,7 +153,7 @@ int main(int argc, char *argv[]) {
     /* avoid some startup jitter */
     for(first=100, i=0; i < nloops+99; i++) 
     {
-      tpause(start_ticks, step_ticks-500);
+      tpause(start_ticks, step_ticks-shift);
       start_ticks += step_ticks; 
       do {
         end_ticks = __rdtsc();
