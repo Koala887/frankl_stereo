@@ -379,7 +379,7 @@ int main(int argc, char *argv[])
     int sfd, s, moreinput, err, verbose, nrchannels, startcount, sumavg,
         stripped, innetbufsize, dobufstats, countdelay, maxbad, nrcp, slowcp, k;
     long blen, hlen, ilen, olen, extra, loopspersec, nrdelays, sleep,
-         nsec, csec, count, wnext, badloops, badreads, readmissing, avgav, checkav;
+         nsec, csec, count, wnext, badloops, badreads, readmissing, avgav, checkav, shift;
     long long icount, ocount, badframes, start_ticks, end_ticks, last_ticks,
     nsec_ticks, timecheck_ticks, copy_ticks, csec_ticks, sleep_ticks;
     void *buf, *iptr, *optr, *tbuf, *max;
@@ -415,7 +415,8 @@ int main(int argc, char *argv[])
         {"period-size", required_argument, 0, 'P' },
         {"device", required_argument, 0, 'd' },
         {"extra-bytes-per-second", required_argument, 0, 'e' },
-        {"number-copies", required_argument, 0, 'R' },
+        {"shift", required_argument, 0, 'x' },
+		{"number-copies", required_argument, 0, 'R' },
         {"slow-copies", no_argument, 0, 'C' },
         {"sleep", required_argument, 0, 'D' },
         {"max-bad-reads", required_argument, 0, 'm' },
@@ -461,12 +462,13 @@ int main(int argc, char *argv[])
     maxbad = 4;
     nonblock = 0;
     innetbufsize = 0;
+	shift = 100;
     corr = 0;
     verbose = 0;
     stripped = 0;
     dobufstats = 1;
     countdelay = 1;
-    while ((optc = getopt_long(argc, argv, "r:p:Sb:D:i:n:s:f:k:Mc:P:d:R:Ce:m:K:o:NXO:vyjVh",
+    while ((optc = getopt_long(argc, argv, "r:p:Sb:D:i:n:s:f:k:Mc:P:d:R:Ce:x:m:K:o:NXO:vyjVh",
             longoptions, &optind)) != -1) {
         switch (optc) {
         case 'r':
@@ -553,6 +555,9 @@ int main(int argc, char *argv[])
         case 'N':
           nonblock = 1;
           break;
+        case 'x':
+          shift = atoi(optarg);
+          break;		  
         case 'O':
           break;
         case 'v':
@@ -937,7 +942,7 @@ int main(int argc, char *argv[])
 		  last_ticks = start_ticks;
           start_ticks += nsec_ticks;
           refreshmem(iptr, s);
-		  tpause(last_ticks, nsec_ticks-100);
+		  tpause(last_ticks, nsec_ticks-shift);
           while (start_ticks > __rdtsc());
           snd_pcm_mmap_commit(pcm_handle, offset, frames);
           icount += s;
@@ -976,7 +981,7 @@ int main(int argc, char *argv[])
           start_ticks += nsec_ticks;
 		  
           refreshmem(iptr, s);
-		  tpause(last_ticks, nsec_ticks-100);
+		  tpause(last_ticks, nsec_ticks-shift);
           while (start_ticks > read_tsc());
           snd_pcm_mmap_commit(pcm_handle, offset, frames);
           icount += s;
@@ -1028,7 +1033,7 @@ int main(int argc, char *argv[])
 		  last_ticks = start_ticks;
           start_ticks += nsec_ticks;
           refreshmem(iptr, s);
-		  tpause(last_ticks, nsec_ticks-100);
+		  tpause(last_ticks, nsec_ticks-shift);
           while (start_ticks > __rdtsc());
           snd_pcm_mmap_commit(pcm_handle, offset, frames);
           icount += s;
@@ -1148,7 +1153,7 @@ int main(int argc, char *argv[])
           if (verbose > 1 && nrdelays > 0 && count % 4096 == 0) {
               fprintf(stderr, "playhrt: Number of delayed loops: %ld (%ld sec %ld nsec).\n", nrdelays, mtime.tv_sec, mtime.tv_nsec);
           }
-          tpause(last_ticks, nsec_ticks-100);
+          tpause(last_ticks, nsec_ticks-shift);
 		  while (start_ticks > __rdtsc());
           snd_pcm_mmap_commit(pcm_handle, offset, frames);
           if (s < 0) {

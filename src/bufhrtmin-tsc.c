@@ -103,7 +103,7 @@ static inline int tpause(long long tsc, long long step) {
   return (0);
 }
 
-long ticks_to_ns(long ticks)
+long long ticks_to_ns(long long ticks)
 { 
     __uint128_t x = ticks;
     x *= 1000000000ull;
@@ -125,8 +125,8 @@ int main(int argc, char *argv[])
     struct sockaddr_in serv_addr;
     int listenfd, connfd, ifd, s, moreinput, optval=1, rate,
         bytesperframe, optc, interval, innetbufsize, nrcp,
-        outnetbufsize, shift;
-    long blen, hlen, ilen, olen, outpersec, loopspersec, nsec, count, wnext;
+        outnetbufsize;
+    long blen, hlen, ilen, olen, outpersec, loopspersec, nsec, count, wnext, shift;
     long long icount, ocount;
     long long start_ticks, last_ticks, nsec_ticks;
     void *buf, *iptr, *optr, *max;

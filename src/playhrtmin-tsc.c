@@ -120,7 +120,7 @@ int main(int argc, char *argv[])
     int sfd, s, nrchannels, startcount,
         stripped, innetbufsize, nrcp, slowcp, k;
     long blen, ilen, olen, extra, loopspersec, sleep,
-         nsec, csec, count;
+         nsec, csec, count, shift;
     long long icount, ocount;
     long long start_ticks, last_ticks, nsec_ticks, copy_ticks, csec_ticks, sleep_ticks;
     void *buf, *iptr, *tbuf;
@@ -152,7 +152,8 @@ int main(int argc, char *argv[])
         {"period-size", required_argument, 0, 'P' },
         {"device", required_argument, 0, 'd' },
         {"extra-bytes-per-second", required_argument, 0, 'e' },
-        {"number-copies", required_argument, 0, 'R' },
+        {"shift", required_argument, 0, 'x' },
+		{"number-copies", required_argument, 0, 'R' },
         {"slow-copies", no_argument, 0, 'C' },
         {"sleep", required_argument, 0, 'D' },
         {"max-bad-reads", required_argument, 0, 'm' },
@@ -197,8 +198,9 @@ int main(int argc, char *argv[])
     sleep = 0;
     nonblock = 0;
     innetbufsize = 0;
+    shift = 100;
     stripped = 1;
-    while ((optc = getopt_long(argc, argv, "r:p:Sb:D:i:n:s:f:k:Mc:P:d:R:Ce:m:K:o:NXO:vyjVh",
+    while ((optc = getopt_long(argc, argv, "r:p:Sb:D:i:n:s:f:k:Mc:P:d:R:Ce:x:m:K:o:NXO:vyjVh",
             longoptions, &optind)) != -1) {
         switch (optc) {
         case 'r':
@@ -283,6 +285,9 @@ int main(int argc, char *argv[])
         case 'N':
           nonblock = 1;
           break;
+        case 'x':
+          shift = atoi(optarg);
+          break;		  
         case 'O':
           break;
         case 'v':
@@ -498,7 +503,7 @@ int main(int argc, char *argv[])
           last_ticks = start_ticks;
 		      start_ticks += nsec_ticks;
           refreshmem(iptr, s);
-          tpause(last_ticks, nsec_ticks-100);
+          tpause(last_ticks, nsec_ticks-shift);
 		      while (start_ticks > __rdtsc());
           snd_pcm_mmap_commit(pcm_handle, offset, frames);
           icount += s;
@@ -536,7 +541,7 @@ int main(int argc, char *argv[])
           last_ticks = start_ticks;
 		      start_ticks += nsec_ticks;
           refreshmem(iptr, s);
-          tpause(last_ticks, nsec_ticks-100);
+          tpause(last_ticks, nsec_ticks-shift);
 		      while (start_ticks > __rdtsc());
           snd_pcm_mmap_commit(pcm_handle, offset, frames);
           icount += s;
