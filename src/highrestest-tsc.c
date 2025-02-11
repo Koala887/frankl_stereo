@@ -60,6 +60,7 @@ long long get_tsc_freq(void)
   __uint128_t x = 1000000000ull;
   x <<= pc->time_shift;
   x /= pc->time_mult;
+  x += 1;
   return (x);
 }
 
