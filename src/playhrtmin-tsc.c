@@ -30,18 +30,17 @@ http://www.gnu.org/licenses/gpl.txt for license details.
 #include <asm/unistd.h>
 #include <inttypes.h>
 
+void usage( ) {
+  fprintf(stderr,
+          "playhrt (version %s of frankl's stereo utilities",
+          VERSION);
+}
 
 long long tsc_freq_hz;
 static long perf_event_open(struct perf_event_attr *hw_event, pid_t pid,
            int cpu, int group_fd, unsigned long flags)
 {
     return syscall(__NR_perf_event_open, hw_event, pid, cpu, group_fd, flags);
-}
-
-void usage( ) {
-  fprintf(stderr,
-          "playhrt (version %s of frankl's stereo utilities",
-          VERSION);
 }
 
 long long get_tsc_freq(void)
@@ -90,7 +89,7 @@ static inline unsigned long long read_tsc(void)
 static inline int tpause(long long tsc, long long step) {
   int i, loops;
   long sleep;
-  loops = (step / 100000) + 1;
+  loops = (step / 100000) + 1; /*max sleeptime=100000*/
   sleep = (step / loops);
   for (i = 1; i < loops; i++)
   {
@@ -100,7 +99,7 @@ static inline int tpause(long long tsc, long long step) {
   return (0);
 }
 
-long ticks_to_ns(long ticks)
+long long ticks_to_ns(long long ticks)
 { 
     __uint128_t x = ticks;
     x *= 1000000000ull;
@@ -123,7 +122,7 @@ int main(int argc, char *argv[])
     long blen, ilen, olen, extra, loopspersec, sleep,
          nsec, csec, count;
     long long icount, ocount;
-    long long start_ticks, nsec_ticks, copy_ticks, csec_ticks, sleep_ticks, last_ticks;
+    long long start_ticks, last_ticks, nsec_ticks, copy_ticks, csec_ticks, sleep_ticks;
     void *buf, *iptr, *tbuf;
     double looperr, extraerr, extrabps;
     snd_pcm_t *pcm_handle;
@@ -327,7 +326,7 @@ int main(int argc, char *argv[])
 	
     if (slowcp){
 	    csec = nsec / (4*nrcp);
-        csec_ticks = ns_to_ticks(csec);
+      csec_ticks = ns_to_ticks(csec);
 	}
     /* olen in frames written per loop */
     olen = rate/loopspersec;
@@ -374,7 +373,7 @@ int main(int argc, char *argv[])
     /**********************************************************************/
     /* setup network connection                                           */
     /**********************************************************************/
-    /* setup network connection */
+
     if (host != NULL && port != NULL) {
         sfd = fd_net(host, port);
         if (innetbufsize != 0) {
@@ -387,7 +386,7 @@ int main(int argc, char *argv[])
     /**********************************************************************/
     /* setup sound device                                                 */
     /**********************************************************************/
-    /* setup sound device */
+
     snd_pcm_hw_params_malloc(&hwparams);
     if (snd_pcm_open(&pcm_handle, pcm_name, SND_PCM_STREAM_PLAYBACK, 0) < 0) {
         exit(5);
@@ -451,9 +450,9 @@ int main(int argc, char *argv[])
 
     /* use defined sleep (us) to allow input process to fill pipeline */
     if (sleep > 0) {
-		sleep_ticks = ns_to_ticks(sleep*1000);
+		  sleep_ticks = ns_to_ticks(sleep*1000);
 
-		tpause(start_ticks, sleep_ticks);
+		  tpause(start_ticks, sleep_ticks);
 
     /* waits until pipeline is filled */
     } else {
@@ -468,7 +467,7 @@ int main(int argc, char *argv[])
 
       /* now sleep until the pipeline is filled */
       sleep = (long)((fcntl(sfd, F_GETPIPE_SZ)/bytesperframe)*1000000.0/rate); /* us */
-   		sleep_ticks = ns_to_ticks(sleep*1000);
+   	  sleep_ticks = ns_to_ticks(sleep*1000);
       tpause(start_ticks, sleep_ticks);
     }
 	

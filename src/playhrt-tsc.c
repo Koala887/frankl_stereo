@@ -17,12 +17,14 @@ http://www.gnu.org/licenses/gpl.txt for license details.
 #include <unistd.h>
 #include <string.h>
 #include <time.h>
+#include <sys/mman.h>
 #include <alsa/asoundlib.h>
 #include "cprefresh.h"
 #include <linux/prctl.h>
 #include <sys/prctl.h>
 #include <emmintrin.h> 
 #include <x86intrin.h>
+#include <x86gprintrin.h>
 #include <linux/perf_event.h>
 #include <asm/unistd.h>
 #include <inttypes.h>
@@ -31,13 +33,6 @@ http://www.gnu.org/licenses/gpl.txt for license details.
       s/^"\(.*\)\\n"$/\1/
       s/.*$/"\0\\n"/
 */
-
-long long tsc_freq_hz;
-static long perf_event_open(struct perf_event_attr *hw_event, pid_t pid,
-           int cpu, int group_fd, unsigned long flags)
-{
-    return syscall(__NR_perf_event_open, hw_event, pid, cpu, group_fd, flags);
-}
 
 void usage( ) {
   fprintf(stderr,
@@ -299,6 +294,13 @@ void usage( ) {
 );
 }
 
+long long tsc_freq_hz;
+static long perf_event_open(struct perf_event_attr *hw_event, pid_t pid,
+           int cpu, int group_fd, unsigned long flags)
+{
+    return syscall(__NR_perf_event_open, hw_event, pid, cpu, group_fd, flags);
+}
+
 long long get_tsc_freq(void)
 {
   struct perf_event_attr pe = {
@@ -342,7 +344,20 @@ static inline unsigned long long read_tsc(void)
   return (tsc);
 }
 
-long ticks_to_ns(long ticks)
+static inline int tpause(long long tsc, long long step) {
+  int i, loops;
+  long sleep;
+  loops = (step / 100000) + 1; /*max sleeptime=100000*/
+  sleep = (step / loops);
+  for (i = 1; i < loops; i++)
+  {
+    _tpause(1,(tsc + (i * sleep)));
+  }
+  _tpause(0,tsc + step);
+  return (0);
+}
+
+long long ticks_to_ns(long long ticks)
 { 
     __uint128_t x = ticks;
     x *= 1000000000ull;
@@ -365,8 +380,8 @@ int main(int argc, char *argv[])
         stripped, innetbufsize, dobufstats, countdelay, maxbad, nrcp, slowcp, k;
     long blen, hlen, ilen, olen, extra, loopspersec, nrdelays, sleep,
          nsec, csec, count, wnext, badloops, badreads, readmissing, avgav, checkav;
-    long long icount, ocount, badframes;
-    long long start_ticks, end_ticks, last_ticks, nsec_ticks, copy_ticks, csec_ticks, sleep_ticks;
+    long long icount, ocount, badframes, start_ticks, end_ticks, last_ticks,
+    nsec_ticks, timecheck_ticks, copy_ticks, csec_ticks, sleep_ticks;
     void *buf, *iptr, *optr, *tbuf, *max;
     struct timespec mtime, ctime;
     struct timespec mtimecheck;
@@ -646,7 +661,9 @@ int main(int argc, char *argv[])
     iptr = buf;
     optr = buf;
 
-    /* setup network connection */
+    /**********************************************************************/
+    /* setup network connection                                           */
+    /**********************************************************************/
     if (host != NULL && port != NULL) {
         sfd = fd_net(host, port);
         if (innetbufsize != 0) {
@@ -658,7 +675,9 @@ int main(int argc, char *argv[])
         }
     }
 
-    /* setup sound device */
+    /**********************************************************************/
+    /* setup sound device                                                 */
+    /**********************************************************************/
     snd_pcm_hw_params_malloc(&hwparams);
     if (snd_pcm_open(&pcm_handle, pcm_name, SND_PCM_STREAM_PLAYBACK, 0) < 0) {
         fprintf(stderr, "playhrt: Error opening PCM device %s\n", pcm_name);
@@ -752,25 +771,23 @@ int main(int argc, char *argv[])
     /* use defined sleep (us) to allow input process to fill pipeline */
     if (sleep > 0) {
 		sleep_ticks = ns_to_ticks(sleep*1000);
-		start_ticks += sleep_ticks;
-		while (start_ticks > read_tsc());
+		tpause(start_ticks, sleep_ticks);
 
     /* waits until pipeline is filled */
     } else {
-        fd_set rdfs;
-        FD_ZERO(&rdfs);
-        FD_SET(sfd, &rdfs);
+      fd_set rdfs;
+      FD_ZERO(&rdfs);
+      FD_SET(sfd, &rdfs);
 
-        /* select() waits until pipeline is ready */
-        if (select(sfd+1, &rdfs, NULL, NULL, NULL) <=0 ) {
-            exit(20);
-        };
+      /* select() waits until pipeline is ready */
+      if (select(sfd+1, &rdfs, NULL, NULL, NULL) <=0 ) {
+        exit(20);
+      };
 
-        /* now sleep until the pipeline is filled */
-        sleep = (long)((fcntl(sfd, F_GETPIPE_SZ)/bytesperframe)*1000000.0/rate); /* us */
-   		sleep_ticks = ns_to_ticks(sleep*1000);
-		start_ticks += sleep_ticks;
-		while (start_ticks > read_tsc());
+      /* now sleep until the pipeline is filled */
+      sleep = (long)((fcntl(sfd, F_GETPIPE_SZ)/bytesperframe)*1000000.0/rate); /* us */
+   	  sleep_ticks = ns_to_ticks(sleep*1000);
+      tpause(start_ticks, sleep_ticks);
     }
 	
     /**********************************************************************/
@@ -917,9 +934,11 @@ int main(int argc, char *argv[])
           iptr = areas[0].addr + offset * bytesperframe;
           memclean(iptr, ilen);
           s = read(sfd, iptr, ilen);
-		  start_ticks += nsec_ticks;
+		  last_ticks = start_ticks;
+          start_ticks += nsec_ticks;
           refreshmem(iptr, s);
-		  while (start_ticks > read_tsc());
+		  tpause(last_ticks, nsec_ticks-100);
+          while (start_ticks > __rdtsc());
           snd_pcm_mmap_commit(pcm_handle, offset, frames);
           icount += s;
           ocount += s;
@@ -937,12 +956,11 @@ int main(int argc, char *argv[])
           if (slowcp) {
               copy_ticks = start_ticks;
               for (k=nrcp; k; k--) {
-                  copy_ticks += csec_ticks;
-				  while (copy_ticks > read_tsc());
+                  tpause(copy_ticks, csec_ticks);
                   memclean((char*)tbuf, ilen);
                   cprefresh((char*)tbuf, (char*)iptr, ilen);
                   copy_ticks += csec_ticks;
-				  while (copy_ticks > read_tsc());
+				  tpause(copy_ticks, csec_ticks);
                   memclean((char*)iptr, ilen);
                   cprefresh((char*)iptr, (char*)tbuf, ilen);
               }
@@ -954,10 +972,12 @@ int main(int argc, char *argv[])
                   cprefresh((char*)iptr, (char*)tbuf, ilen);
               }
           }
-		  start_ticks += nsec_ticks;
+		  last_ticks = start_ticks;
+          start_ticks += nsec_ticks;
 		  
           refreshmem(iptr, s);
-		  while (start_ticks > read_tsc());
+		  tpause(last_ticks, nsec_ticks-100);
+          while (start_ticks > read_tsc());
           snd_pcm_mmap_commit(pcm_handle, offset, frames);
           icount += s;
           ocount += s;
@@ -989,13 +1009,11 @@ int main(int argc, char *argv[])
           if (slowcp) {
               copy_ticks = start_ticks;
               for (k=nrcp; k; k--) {
-                  ctime.tv_nsec += csec;
-                  copy_ticks += csec_ticks;
-				  while (copy_ticks > read_tsc());
+				  tpause(copy_ticks, csec_ticks);
                   memclean((char*)tbuf, ilen);
                   cprefresh((char*)tbuf, (char*)iptr, ilen);
                   copy_ticks += csec_ticks;
-				  while (copy_ticks > read_tsc());
+				  tpause(copy_ticks, csec_ticks);
                   memclean((char*)iptr, ilen);
                   cprefresh((char*)iptr, (char*)tbuf, ilen);
               }
@@ -1007,9 +1025,11 @@ int main(int argc, char *argv[])
                   cprefresh((char*)iptr, (char*)tbuf, ilen);
               }
           }
-		  start_ticks += nsec_ticks;
+		  last_ticks = start_ticks;
+          start_ticks += nsec_ticks;
           refreshmem(iptr, s);
-		  while (start_ticks > read_tsc());
+		  tpause(last_ticks, nsec_ticks-100);
+          while (start_ticks > __rdtsc());
           snd_pcm_mmap_commit(pcm_handle, offset, frames);
           icount += s;
           ocount += s;
@@ -1019,16 +1039,15 @@ int main(int argc, char *argv[])
     } else if (access == SND_PCM_ACCESS_MMAP_INTERLEAVED) {
       /* mmap access */
       /* why does start threshold not work ??? */
-     if (verbose)
-         fprintf(stderr, "playhrt: Using mmap access.\n");
-     startcount = hwbufsize/(2*olen);
-     if (clock_gettime(CLOCK_MONOTONIC, &mtime) < 0) {
-          fprintf(stderr, "playhrt: Cannot get monotonic clock.\n");
-          exit(19);
-      }
       if (verbose)
-         fprintf(stderr, "playhrt: Start time (%ld sec %ld nsec).\n",
-                         mtime.tv_sec, mtime.tv_nsec);
+        fprintf(stderr, "playhrt: Using mmap access.\n");
+      startcount = hwbufsize/(2*olen);
+      /* get time */
+      start_ticks = read_tsc();
+      nsec2timespec(&mtime, ticks_to_ns(start_ticks) );
+      if (verbose)
+        fprintf(stderr, "playhrt: Start time (%ld sec %ld nsec).\n",
+                        mtime.tv_sec, mtime.tv_nsec);
       sumavg= 0;
       checktime = 0;
       for (count=1, off=looperr; 1; count++, off+=looperr) {
@@ -1094,25 +1113,15 @@ int main(int argc, char *argv[])
           /* in --mmap mode we read directly into mmaped space without internal buffer */
           s = read(sfd, iptr, ilen);
           if (slowcp) {
-              ctime.tv_nsec = mtime.tv_nsec;
-              ctime.tv_sec = mtime.tv_sec;
+              copy_ticks = start_ticks;
               for (k=nrcp; k; k--) {
-                  ctime.tv_nsec += csec;
-                  if (ctime.tv_nsec > 999999999) {
-                    ctime.tv_nsec -= 1000000000;
-                    ctime.tv_sec++;
-                  }
-                  clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &ctime, NULL);
-                  memclean((char*)tbuf, ilen);
-                  cprefresh((char*)tbuf, (char*)iptr, ilen);
-                  ctime.tv_nsec += csec;
-                  if (ctime.tv_nsec > 999999999) {
-                    ctime.tv_nsec -= 1000000000;
-                    ctime.tv_sec++;
-                  }
-                  clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &ctime, NULL);
-                  memclean((char*)iptr, ilen);
-                  cprefresh((char*)iptr, (char*)tbuf, ilen);
+                tpause(copy_ticks, csec_ticks);
+                memclean((char*)tbuf, ilen);
+                cprefresh((char*)tbuf, (char*)iptr, ilen);
+                copy_ticks += csec_ticks;
+				tpause(copy_ticks, csec_ticks);
+                memclean((char*)iptr, ilen);
+                cprefresh((char*)iptr, (char*)tbuf, ilen);
               }
           } else {
               for (k=nrcp; k; k--) {
@@ -1124,27 +1133,23 @@ int main(int argc, char *argv[])
           }
 
           /* compute time for next wakeup */
-          mtime.tv_nsec += nsec;
-          if (mtime.tv_nsec > 999999999) {
-            mtime.tv_nsec -= 1000000000;
-            mtime.tv_sec++;
-          }
-
-
+          last_ticks = start_ticks;
+		  start_ticks += nsec_ticks;
           /* we refresh the new data before sleeping and commiting */
           refreshmem(iptr, s);
 
           /* debug:  check that we really sleep to some time in the future */
           if (countdelay) {
-            clock_gettime(CLOCK_MONOTONIC, &mtimecheck);
-            if (mtimecheck.tv_sec > mtime.tv_sec || (mtimecheck.tv_sec == mtime.tv_sec && mtimecheck.tv_nsec > mtime.tv_nsec))
+            timecheck_ticks = read_tsc();
+            if (timecheck_ticks > start_ticks)
                 nrdelays += 1;
           }
           if (verbose > 1 && nrdelays > 0 && count % 4096 == 0) {
+		      nsec2timespec(&mtime, ticks_to_ns(start_ticks) );
               fprintf(stderr, "playhrt: Number of delayed loops: %ld (%ld sec %ld nsec).\n", nrdelays, mtime.tv_sec, mtime.tv_nsec);
           }
-
-          clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &mtime, NULL);
+          tpause(last_ticks, nsec_ticks-100);
+		  while (start_ticks > __rdtsc());
           snd_pcm_mmap_commit(pcm_handle, offset, frames);
           if (s < 0) {
               fprintf(stderr, "playhrt: Read error.\n");
