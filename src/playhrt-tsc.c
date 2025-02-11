@@ -1135,6 +1135,7 @@ int main(int argc, char *argv[])
           /* compute time for next wakeup */
           last_ticks = start_ticks;
 		  start_ticks += nsec_ticks;
+          nsec2timespec(&mtime, ticks_to_ns(start_ticks) );
           /* we refresh the new data before sleeping and commiting */
           refreshmem(iptr, s);
 
@@ -1145,7 +1146,6 @@ int main(int argc, char *argv[])
                 nrdelays += 1;
           }
           if (verbose > 1 && nrdelays > 0 && count % 4096 == 0) {
-		      nsec2timespec(&mtime, ticks_to_ns(start_ticks) );
               fprintf(stderr, "playhrt: Number of delayed loops: %ld (%ld sec %ld nsec).\n", nrdelays, mtime.tv_sec, mtime.tv_nsec);
           }
           tpause(last_ticks, nsec_ticks-100);
