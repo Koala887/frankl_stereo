@@ -23,65 +23,120 @@ http://www.gnu.org/licenses/gpl.txt for license details.
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <sys/mman.h>
-#include <semaphore.h>
 #include <linux/prctl.h>
 #include <sys/prctl.h>
 #include "cprefresh.h"
+#include <emmintrin.h>
+#include <x86intrin.h>
+#include <x86gprintrin.h>
+#include <linux/perf_event.h>
+#include <asm/unistd.h>
+#include <inttypes.h>
 
 #define TBUF 134217728 /* 2^27 */
 
-/* help page */
-/* vim hint to remove resp. add quotes:
-      s/^"\(.*\)\\n"$/\1/
-      s/.*$/"\0\\n"/
-*/
+long long tsc_freq_hz;
+static long perf_event_open(struct perf_event_attr *hw_event, pid_t pid,
+                            int cpu, int group_fd, unsigned long flags)
+{
+  return syscall(__NR_perf_event_open, hw_event, pid, cpu, group_fd, flags);
+}
+
 void usage()
 {
   fprintf(stderr,
           "bufhrt (version %s of frankl's stereo utilities)\nUSAGE:\n",
           VERSION);
 }
-inline long difftimens(struct timespec t1, struct timespec t2)
+
+long long get_tsc_freq(void)
 {
-  long long l1, l2;
-  l1 = t1.tv_sec * 1000000000 + t1.tv_nsec;
-  l2 = t2.tv_sec * 1000000000 + t2.tv_nsec;
-  return (long)(l2 - l1);
+  struct perf_event_attr pe = {
+      .type = PERF_TYPE_HARDWARE,
+      .size = sizeof(struct perf_event_attr),
+      .config = PERF_COUNT_HW_INSTRUCTIONS,
+      .disabled = 1,
+      .exclude_kernel = 1,
+      .exclude_hv = 1};
+  int fd = perf_event_open(&pe, 0, -1, -1, 0);
+  if (fd == -1)
+  {
+    perror("perf_event_open failed");
+    return 1;
+  }
+  void *addr = mmap(NULL, 4 * 1024, PROT_READ, MAP_SHARED, fd, 0);
+  if (!addr)
+  {
+    perror("mmap failed");
+    return 1;
+  }
+  struct perf_event_mmap_page *pc = addr;
+  if (pc->cap_user_time != 1)
+  {
+    fprintf(stderr, "Perf system doesn't support user time\n");
+    return 1;
+  }
+  close(fd);
+
+  __uint128_t x = 1000000000ull;
+  x <<= pc->time_shift;
+  x /= pc->time_mult;
+  x += 1;
+  return (x);
 }
 
-/* after calibration nsloop will take cnt ns */
-double nsloopfactor = 1.0;
-
-static inline long nsloop(long cnt)
+static inline unsigned long long read_tsc(void)
 {
-  long i, j;
-  for (j = 1, i = (long)(cnt * nsloopfactor); i > 0; i--)
-    j = j + i;
-  return j;
+  unsigned long long tsc;
+  _mm_lfence();
+  tsc = __rdtsc();
+  _mm_lfence();
+  return (tsc);
+}
+
+static inline int tpause(long long tsc, long long step)
+{
+  int i, loops;
+  long sleep;
+  loops = (step / 100000) + 1;
+  sleep = (step / loops);
+  for (i = 1; i < loops; i++)
+  {
+    _tpause(1, (tsc + (i * sleep)));
+  }
+  _tpause(0, tsc + step);
+  return (0);
+}
+
+long long ticks_to_ns(long long ticks)
+{
+  __uint128_t x = ticks;
+  x *= 1000000000ull;
+  x /= tsc_freq_hz;
+  return (x);
+}
+
+long ns_to_ticks(long ns)
+{
+  __uint128_t x = ns;
+  x *= tsc_freq_hz;
+  x /= 1000000000ull;
+  return (x);
 }
 
 int main(int argc, char *argv[])
 {
   struct sockaddr_in serv_addr;
-  int listenfd, connfd, ifd, s, moreinput, optval = 1, verbose, rate,
-                                           bytesperframe, optc, interval, shared, innetbufsize, nrcp,
-                                           outnetbufsize, dsync;
-  long blen, hlen, ilen, olen, outpersec, loopspersec, nsec, count, wnext,
-      badreads, badreadbytes, badwrites, badwritebytes, lcount,
-      dcount, dsyncfreq, fsize, e, a, outtime, outcopies, rambps, ramlps,
-      ramtime, ramchunk, shift;
+  int listenfd, connfd, ifd, s, moreinput, optval = 1, rate,
+                                           bytesperframe, optc, interval, innetbufsize, nrcp,
+                                           outnetbufsize;
+  long blen, hlen, ilen, olen, outpersec, loopspersec, nsec, count, wnext, shift;
   long long icount, ocount;
+  long long start_ticks, nsec_ticks;
   void *buf, *iptr, *optr, *max;
-  char *port, *inhost, *inport, *outfile, *infile, *ptmp, *tbuf;
-  void *obufs[1024];
-  struct timespec mtime, mtime1, ttime;
-  double looperr, extraerr, extrabps, off, dsyncpersec;
+  char *port, *inhost, *inport, *outfile, *infile;
+  double looperr, extraerr, extrabps, off;
   /* variables for shared memory input */
-  char **fname, *fnames[100], **tmpname, *tmpnames[100], **mem, *mems[100],
-      *ptr;
-  sem_t **sem, *sems[100], **semw, *semsw[100];
-  int fd[100], i, k, flen, size, c, sz;
-  struct stat sb;
 
   /* read command line options */
   static struct option longoptions[] = {
@@ -124,8 +179,6 @@ int main(int argc, char *argv[])
   }
   /* defaults */
   port = NULL;
-  dsync = 0;
-  dsyncpersec = 0;
   outfile = NULL;
   blen = 65536;
   /* default input is stdin */
@@ -135,25 +188,17 @@ int main(int argc, char *argv[])
   ilen = 0;
   loopspersec = 1000;
   outpersec = 0;
-  ramlps = 0;
-  rambps = 0;
-  ramtime = 0;
-  ramchunk = 0;
-  outcopies = 0;
-  outtime = 0;
   rate = 0;
   bytesperframe = 0;
   inhost = NULL;
   inport = NULL;
   infile = NULL;
-  shared = 0;
   interval = 0;
   extrabps = 0.0;
   nrcp = 0;
   innetbufsize = 0;
   outnetbufsize = 0;
-  shift = 0;
-  verbose = 0;
+  shift = 100;
   while ((optc = getopt_long(argc, argv, "p:o:b:i:D:n:m:X:Y:s:f:F:R:c:H:P:e:x:vVIhd",
                              longoptions, &optind)) != -1)
   {
@@ -163,7 +208,6 @@ int main(int argc, char *argv[])
       port = optarg;
       break;
     case 'd':
-      dsync = 1;
       break;
     case 'o':
       outfile = optarg;
@@ -181,10 +225,8 @@ int main(int argc, char *argv[])
       outpersec = atoi(optarg);
       break;
     case 'X':
-      ramlps = atoi(optarg);
       break;
     case 'Y':
-      rambps = atoi(optarg);
       break;
     case 's':
       rate = atoi(optarg);
@@ -195,9 +237,6 @@ int main(int argc, char *argv[])
         nrcp = 0;
       break;
     case 'c':
-      outcopies = atoi(optarg);
-      if (outcopies < 0 || outcopies > 1000)
-        outcopies = 0;
       break;
     case 'f':
       if (strcmp(optarg, "S16_LE") == 0)
@@ -234,13 +273,12 @@ int main(int argc, char *argv[])
       ifd = 0;
       break;
     case 'M':
-      shared = 1;
       break;
     case 'e':
       extrabps = atof(optarg);
       break;
     case 'D':
-      dsyncpersec = atof(optarg);
+      break;
     case 'K':
       innetbufsize = atoi(optarg);
       if (innetbufsize != 0 && innetbufsize < 128)
@@ -253,13 +291,13 @@ int main(int argc, char *argv[])
       break;
     case 'x':
       shift = atoi(optarg);
+      break;
     case 'O':
       break; /* ignored */
     case 'I':
       interval = 1;
       break;
     case 'v':
-      verbose = 1;
       break;
     case 'V':
       fprintf(stderr,
@@ -271,6 +309,13 @@ int main(int argc, char *argv[])
       exit(3);
     }
   }
+
+  /* avoid waiting 50000 ns collecting more sleep requests */
+  prctl(PR_SET_TIMERSLACK, 1L);
+
+  /* get tsc frequency */
+  tsc_freq_hz = get_tsc_freq();
+
   /* check some arguments, open files and set some parameters */
   if (outfile)
   {
@@ -287,11 +332,7 @@ int main(int argc, char *argv[])
       exit(2);
     }
   }
-  /* translate --dsync */
-  if (dsync)
-    dsyncfreq = 1;
-  if (dsyncpersec)
-    dsyncfreq = (long)(loopspersec / dsyncpersec);
+
   if (outpersec == 0)
   {
     if (rate != 0 && bytesperframe != 0)
@@ -312,27 +353,11 @@ int main(int argc, char *argv[])
       exit(23);
     }
   }
-  if (ramlps != 0 && rambps != 0)
-  {
-    ramtime = 1000000000 / (2 * ramlps);
-    ramchunk = rambps / ramlps;
-    while (ramchunk % 16 != 0)
-      ramchunk++;
-    if (ramchunk > TBUF)
-      ramchunk = TBUF;
-  }
-
-  /* avoid waiting 50000 ns collecting more sleep requests */
-  prctl(PR_SET_TIMERSLACK, 1L);
-
-  /* calibrate sleep loop */
-  clock_gettime(CLOCK_MONOTONIC, &mtime);
-  nsloop(10000000);
-  clock_gettime(CLOCK_MONOTONIC, &ttime);
-  nsloopfactor = 1.0 * 10000000 / (difftimens(mtime, ttime) - 50);
 
   extraerr = 1.0 * outpersec / (outpersec + extrabps);
   nsec = (int)(1000000000 * extraerr / loopspersec);
+  // calculate ticks per step
+  nsec_ticks = ns_to_ticks(nsec);
   olen = outpersec / loopspersec;
   if (olen <= 0)
     olen = 1;
@@ -371,20 +396,6 @@ int main(int argc, char *argv[])
   max = buf + blen;
   iptr = buf;
   optr = buf;
-
-  /* buffers for loop of output copies */
-  if (outcopies > 0)
-  {
-    /* spend half of loop duration with copies of output chunk */
-    outtime = nsec / (8 * outcopies);
-    for (i = 1; i < outcopies; i++)
-    {
-      if (posix_memalign(obufs + i, 4096, 2 * olen))
-      {
-        exit(20);
-      }
-    }
-  }
 
   /* outgoing socket */
   if (port != 0)
@@ -443,37 +454,20 @@ int main(int argc, char *argv[])
   else
     wnext = olen;
 
-  if (clock_gettime(CLOCK_MONOTONIC, &mtime) < 0)
-  {
-    exit(14);
-  }
-
+  start_ticks = read_tsc();
   /* main loop */
-  badreads = 0;
-  badwrites = 0;
-  badreadbytes = 0;
-  badwritebytes = 0;
+
   for (count = 1, off = looperr; 1; count++, off += looperr)
   {
-    /* once cache is filled and other side is reading we reset time */
-    if (count == 500)
-      clock_gettime(CLOCK_MONOTONIC, &mtime);
-    mtime.tv_nsec += nsec;
-    if (mtime.tv_nsec > 999999999)
-    {
-      mtime.tv_nsec -= 1000000000;
-      mtime.tv_sec++;
-    }
     refreshmem((char *)optr, wnext);
-    while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &mtime, NULL) != 0)
-      ;
+    tpause(start_ticks, nsec_ticks);
     /* write a chunk, this comes first after waking from sleep */
     s = write(connfd, optr, wnext);
+    start_ticks += nsec_ticks;    
     if (s < 0)
     {
       exit(15);
     }
-
     ocount += s;
     optr += s;
     wnext = olen + wnext - s;

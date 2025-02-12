@@ -162,13 +162,11 @@ int main(int argc, char *argv[])
     /* avoid some startup jitter */
     for (first = 100, i = 0; i < nloops + 99; i++)
     {
-      tpause(start_ticks, step_ticks - shift);
-      start_ticks += step_ticks;
-      do
-      {
-        end_ticks = __rdtsc();
-      } while (start_ticks > end_ticks);
+      tpause(start_ticks, step_ticks);
 
+      end_ticks = read_tsc();
+      
+      start_ticks += step_ticks;
       d = (ticks_to_ns(end_ticks - last_ticks) - step);
 
       last_ticks = end_ticks;

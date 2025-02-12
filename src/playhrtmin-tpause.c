@@ -128,7 +128,7 @@ int main(int argc, char *argv[])
   long blen, ilen, olen, extra, loopspersec, sleep,
       nsec, csec, count, shift;
   long long icount, ocount;
-  long long start_ticks, last_ticks, nsec_ticks, copy_ticks, csec_ticks, sleep_ticks;
+  long long start_ticks, nsec_ticks, copy_ticks, csec_ticks, sleep_ticks;
   void *buf, *iptr, *tbuf;
   double looperr, extraerr, extrabps;
   snd_pcm_t *pcm_handle;
@@ -553,13 +553,11 @@ int main(int argc, char *argv[])
       iptr = areas[0].addr + offset * bytesperframe;
       memclean(iptr, ilen);
       s = read(sfd, iptr, ilen);
-      last_ticks = start_ticks;
-      start_ticks += nsec_ticks;
+
       refreshmem(iptr, s);
-      tpause(last_ticks, nsec_ticks - shift);
-      while (start_ticks > __rdtsc())
-        ;
+      tpause(start_ticks, nsec_ticks);
       snd_pcm_mmap_commit(pcm_handle, offset, frames);
+      start_ticks += nsec_ticks;      
       icount += s;
       ocount += s;
       if (s == 0) /* done */
@@ -598,13 +596,11 @@ int main(int argc, char *argv[])
           cprefresh((char *)iptr, (char *)tbuf, ilen);
         }
       }
-      last_ticks = start_ticks;
-      start_ticks += nsec_ticks;
+
       refreshmem(iptr, s);
-      tpause(last_ticks, nsec_ticks - shift);
-      while (start_ticks > __rdtsc())
-        ;
+      tpause(start_ticks, nsec_ticks);
       snd_pcm_mmap_commit(pcm_handle, offset, frames);
+      start_ticks += nsec_ticks;      
       icount += s;
       ocount += s;
       if (s == 0) /* done */
