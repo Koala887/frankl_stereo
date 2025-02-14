@@ -40,11 +40,10 @@ int main(int argc, char *argv[])
         stripped, innetbufsize, nrcp, slowcp, k;
   long blen, ilen, olen, extra, loopspersec, sleep,
       nsec, csec, count;
-  long long icount, ocount, badframes;
-  void *buf, *iptr, *optr, *tbuf, *max;
+  long long icount, ocount;
+  void *buf, *iptr, *tbuf;
   struct timespec mtime, ctime;
-  struct timespec mtimecheck;
-  double looperr, off, extraerr, extrabps, morebps;
+  double looperr, extraerr, extrabps;
   snd_pcm_t *pcm_handle;
   snd_pcm_hw_params_t *hwparams;
   snd_pcm_sw_params_t *swparams;
@@ -55,8 +54,6 @@ int main(int argc, char *argv[])
   snd_pcm_access_t access;
   snd_pcm_sframes_t avail;
   const snd_pcm_channel_area_t *areas;
-  double checktime;
-  long corr;
 
   /* read command line options */
   static struct option longoptions[] = {
@@ -122,7 +119,6 @@ int main(int argc, char *argv[])
   sleep = 0;
   nonblock = 0;
   innetbufsize = 0;
-  corr = 0;
   verbose = 0;
   stripped = 1;
 
@@ -304,10 +300,9 @@ int main(int argc, char *argv[])
   }
   /* we put some overlap before the reference pointer */
   buf = buf + (olen + extra) * bytesperframe;
-  max = buf + blen;
+
   /* the pointers for next input and next output */
   iptr = buf;
-  optr = buf;
 
   /**********************************************************************/
   /* setup network connection                                           */
@@ -446,9 +441,6 @@ int main(int argc, char *argv[])
   /* main loop                                                          */
   /**********************************************************************/
   /* main loop */
-
-  badframes = 0;
-
 
   if (access == SND_PCM_ACCESS_MMAP_INTERLEAVED && looperr == 0.0 &&
       stripped)
