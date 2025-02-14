@@ -23,7 +23,6 @@ http://www.gnu.org/licenses/gpl.txt for license details.
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <sys/mman.h>
-#include <semaphore.h>
 #include <linux/prctl.h>
 #include <sys/prctl.h>
 #include "cprefresh.h"
@@ -65,20 +64,17 @@ int main(int argc, char *argv[])
   struct sockaddr_in serv_addr;
   int listenfd, connfd, ifd, s, moreinput, optval = 1, rate,
                                            bytesperframe, optc, interval, innetbufsize, nrcp,
-                                           outnetbufsize, dsync;
+                                           outnetbufsize;
   long blen, hlen, ilen, olen, outpersec, loopspersec, nsec, count, wnext,
       outcopies, rambps, ramlps,
-      ramchunk, shift;
+      ramchunk;
   long long icount, ocount;
   void *buf, *iptr, *optr, *max;
-  char *port, *inhost, *inport, *outfile, *infile, *ptmp, *tbuf;
+  char *port, *inhost, *inport, *outfile, *infile;
   void *obufs[1024];
-  struct timespec mtime, mtime1, ttime;
-  double looperr, extraerr, extrabps, off, dsyncpersec;
-  /* variables for shared memory input */
-  char **fname, *fnames[100], **tmpname, *tmpnames[100], **mem, *mems[100],
-      *ptr;
-  sem_t **sem, *sems[100], **semw, *semsw[100];
+  struct timespec mtime, ttime;
+  double looperr, extraerr, extrabps, off;
+
   int fd[100], i, k, flen, size, c, sz;
   struct stat sb;
 
@@ -123,8 +119,7 @@ int main(int argc, char *argv[])
   }
   /* defaults */
   port = NULL;
-  dsync = 0;
-  dsyncpersec = 0;
+
   outfile = NULL;
   blen = 65536;
   /* default input is stdin */
@@ -149,7 +144,6 @@ int main(int argc, char *argv[])
   nrcp = 0;
   innetbufsize = 0;
   outnetbufsize = 0;
-  shift = 0;
   while ((optc = getopt_long(argc, argv, "p:o:b:i:D:n:m:X:Y:s:f:F:R:c:H:P:e:x:vVIhd",
                              longoptions, &optind)) != -1)
   {
@@ -159,7 +153,6 @@ int main(int argc, char *argv[])
       port = optarg;
       break;
     case 'd':
-      dsync = 1;
       break;
     case 'o':
       outfile = optarg;
@@ -235,7 +228,7 @@ int main(int argc, char *argv[])
       extrabps = atof(optarg);
       break;
     case 'D':
-      dsyncpersec = atof(optarg);
+      break;
     case 'K':
       innetbufsize = atoi(optarg);
       if (innetbufsize != 0 && innetbufsize < 128)
@@ -247,7 +240,7 @@ int main(int argc, char *argv[])
         outnetbufsize = 128;
       break;
     case 'x':
-      shift = atoi(optarg);
+      break;
     case 'O':
       break; /* ignored */
     case 'I':
