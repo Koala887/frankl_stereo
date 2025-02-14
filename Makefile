@@ -67,7 +67,7 @@ bin/highrestest: src/highrestest.c |bin
 bin/highrestest-tsc: src/highrestest-tsc.c |bin
 	$(CC) $(CFLAGSNO) -o bin/highrestest-tsc src/highrestest-tsc.c -lrt
 
-bin/highrestest-tsc: src/highrestest-tpause.c |bin
+bin/highrestest-tpause: src/highrestest-tpause.c |bin
 	$(CC) $(CFLAGSNO) -o bin/highrestest-tpause src/highrestest-tpause.c -lrt
 
 bin/writeloop: src/version.h src/nf_io.h src/writeloop.c tmp/cprefresh.o tmp/cprefresh_ass.o |bin
