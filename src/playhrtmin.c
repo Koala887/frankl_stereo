@@ -36,10 +36,10 @@ void usage()
 
 int main(int argc, char *argv[])
 {
-  int sfd, s, moreinput, err, verbose, nrchannels, startcount, sumavg,
-      stripped, innetbufsize, dobufstats, countdelay, maxbad, nrcp, slowcp, k;
-  long blen, hlen, ilen, olen, extra, loopspersec, nrdelays, sleep,
-      nsec, csec, count, wnext, badloops, badreads, readmissing, avgav, checkav;
+  int sfd, s, verbose, nrchannels, startcount,
+        stripped, innetbufsize, nrcp, slowcp, k;
+  long blen, ilen, olen, extra, loopspersec, sleep,
+      nsec, csec, count;
   long long icount, ocount, badframes;
   void *buf, *iptr, *optr, *tbuf, *max;
   struct timespec mtime, ctime;
@@ -120,14 +120,12 @@ int main(int argc, char *argv[])
   slowcp = 0;
   csec = 0;
   sleep = 0;
-  maxbad = 4;
   nonblock = 0;
   innetbufsize = 0;
   corr = 0;
   verbose = 0;
   stripped = 1;
-  dobufstats = 1;
-  countdelay = 1;
+
   while ((optc = getopt_long(argc, argv, "r:p:Sb:D:i:n:s:f:k:Mc:P:d:R:Ce:m:K:o:NXO:vyjVh",
                              longoptions, &optind)) != -1)
   {
@@ -215,7 +213,6 @@ int main(int argc, char *argv[])
       sleep = atoi(optarg);
       break;
     case 'm':
-      maxbad = atoi(optarg);
       break;
     case 'K':
       innetbufsize = atoi(optarg);
@@ -237,10 +234,8 @@ int main(int argc, char *argv[])
       stripped = 1;
       break;
     case 'y':
-      dobufstats = 0;
       break;
     case 'j':
-      countdelay = 0;
       break;
     case 'V':
       fprintf(stderr,
@@ -289,12 +284,11 @@ int main(int argc, char *argv[])
   {
     blen = 3 * ilen;
   }
-  hlen = blen / 2;
   if (olen * loopspersec == rate)
     looperr = 0.0;
   else
     looperr = (1.0 * rate) / loopspersec - 1.0 * olen;
-  moreinput = 1;
+  
   icount = 0;
   ocount = 0;
   /* for mmap try to set hwbuffer to multiple of output per loop */
@@ -452,11 +446,9 @@ int main(int argc, char *argv[])
   /* main loop                                                          */
   /**********************************************************************/
   /* main loop */
-  badloops = 0;
+
   badframes = 0;
-  badreads = 0;
-  readmissing = 0;
-  nrdelays = 0;
+
 
   if (access == SND_PCM_ACCESS_MMAP_INTERLEAVED && looperr == 0.0 &&
       stripped)
