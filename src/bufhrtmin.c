@@ -75,8 +75,7 @@ int main(int argc, char *argv[])
   struct timespec mtime, ttime;
   double looperr, extraerr, extrabps, off;
 
-  int fd[100], i, k, flen, size, c, sz;
-  struct stat sb;
+  int i;
 
   /* read command line options */
   static struct option longoptions[] = {
