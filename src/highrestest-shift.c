@@ -79,6 +79,14 @@ struct timespec ns_to_timespec(long long ns)
   t1.tv_nsec = ns % 1000000000ull;
   return (t1);
 }
+/* t2 - t1 in nanoseconds */
+long difftimens(struct timespec t1, struct timespec t2)
+{ 
+   long long l1, l2;
+   l1 = t1.tv_sec*1000000000 + t1.tv_nsec;
+   l2 = t2.tv_sec*1000000000 + t2.tv_nsec;
+   return (long)(l2-l1);
+}
 
 static inline unsigned long long read_tsc(void)
 {
@@ -123,7 +131,7 @@ long ns_to_ticks(long ns)
 int main(int argc, char *argv[])
 {
   int ret, highresok, first, nloops, i, k, shift;
-  long step, d, min, max, dev, dint, count[21];
+  long step, d, min, max, dev, dint, count[21], diff;
   struct timespec res, tim;
   long long start_ticks, end_ticks, last_ticks, step_ticks;
 
@@ -151,6 +159,9 @@ int main(int argc, char *argv[])
   start_ticks = read_tsc();
   res = ns_to_timespec(ticks_to_ns(start_ticks));
   printf("ticks to monotonic: %ld s %ld ns (%lld ticks)\n", res.tv_sec, res.tv_nsec, start_ticks);
+  diff = difftimens(ret, res);
+  printf("TSC Differency: %ld ns\n", diff);
+
   if (highresok && argc > 1)
   {
 
@@ -179,8 +190,8 @@ int main(int argc, char *argv[])
     for (first = 100, i = 0; i < nloops + 99; i++)
     {
       start_ticks += step_ticks;
-      res = ns_to_timespec(ticks_to_ns(step_ticks-shift));
-      clock_nanosleep(CLOCK_MONOTONIC, 0, &res, NULL);
+      res = ns_to_timespec(ticks_to_ns(start_ticks)-shift-diff));
+      clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &res, NULL);
       do
       {
         end_ticks = __rdtsc();
