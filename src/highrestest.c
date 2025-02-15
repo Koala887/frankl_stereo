@@ -156,7 +156,7 @@ int main(int argc, char *argv[]) {
         res.tv_sec++;
         res.tv_nsec -= 1000000000;
       }
-      clock_nanosleep(MYCLOCK, TIMER_ABSTIME, &res, NULL);
+      while (clock_nanosleep(MYCLOCK, TIMER_ABSTIME, &res, NULL) != 0);
       clock_gettime(CLOCK_MONOTONIC, &ttime);
       nsloop(shift - difftimens(res, ttime));
       clock_gettime(MYCLOCK, &tim);
