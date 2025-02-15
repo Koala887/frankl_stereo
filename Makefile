@@ -16,7 +16,8 @@ CFLAGSNO=-O0 -Wall -z execstack -D_FILE_OFFSET_BITS=64 -fgnu89-inline -mwaitpkg 
 #     bin/writeloop bin/catloop bin/playhrt bin/playhrtmin bin/playhrtbuschel bin/cptoshm bin/shmcat \
 #     bin/resample_soxr bin/cat64 bin/shownfinfo bin/music2nf
 ALL: bin tmp bin/bufhrt bin/bufhrtmin bin/bufhrtmin-tsc bin/highrestest bin/highrestest-tsc bin/bufhrtmin-tpause\
-     bin/writeloop bin/catloop bin/playhrt bin/playhrtmin bin/playhrtmin-tsc bin/playhrtmin-tpause
+     bin/writeloop bin/catloop bin/playhrt bin/playhrtmin bin/playhrtmin-tsc bin/playhrtmin-tpause\
+	 bin/highrestest-tpause bin/highrestest-shift
 
 bin:
 	mkdir -p bin
@@ -69,6 +70,9 @@ bin/highrestest-tsc: src/highrestest-tsc.c |bin
 
 bin/highrestest-tpause: src/highrestest-tpause.c |bin
 	$(CC) $(CFLAGSNO) -o bin/highrestest-tpause src/highrestest-tpause.c -lrt
+
+bin/highrestest-shift: src/highrestest-shift.c |bin
+	$(CC) $(CFLAGSNO) -o bin/highrestest-shift src/highrestest-shift.c -lrt
 
 bin/writeloop: src/version.h src/nf_io.h src/writeloop.c tmp/cprefresh.o tmp/cprefresh_ass.o |bin
 	$(CC) $(CFLAGS) -o bin/writeloop tmp/cprefresh.o tmp/cprefresh_ass.o src/writeloop.c -lpthread -lrt
