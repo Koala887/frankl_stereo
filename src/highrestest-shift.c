@@ -179,8 +179,8 @@ int main(int argc, char *argv[])
     for (first = 100, i = 0; i < nloops + 99; i++)
     {
       start_ticks += step_ticks;
-      res = ns_to_timespec(ticks_to_ns(start_ticks-shift));
-      clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &res, NULL);
+      res = ns_to_timespec(ticks_to_ns(step_ticks-shift));
+      clock_nanosleep(CLOCK_MONOTONIC, 0, &res, NULL);
       do
       {
         end_ticks = __rdtsc();
