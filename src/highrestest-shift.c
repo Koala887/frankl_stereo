@@ -191,7 +191,7 @@ int main(int argc, char *argv[])
     {
       start_ticks += step_ticks;
       res = ns_to_timespec(ticks_to_ns(start_ticks)-shift-diff);
-      clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &res, NULL);
+      while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &res, NULL) != 0);
       do
       {
         end_ticks = __rdtsc();
