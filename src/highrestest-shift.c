@@ -234,7 +234,11 @@ int main(int argc, char *argv[])
       printf("    %d*%ld        %ld\n", i, dint, count[i + 10]);
     printf(" >  10*%ld        %ld\n", dint, count[20]);
   }
-
+  ret = clock_gettime(CLOCK_MONOTONIC, &tim);
+  start_ticks = read_tsc();
+  res = ns_to_timespec(ticks_to_ns(start_ticks));
+  diff = difftimens(tim, res);
+  printf("TSC Differency: %ld ns\n", diff);
   if (highresok)
     printf("\nHighres timer seems enabled!\n");
   else
