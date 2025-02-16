@@ -95,7 +95,8 @@ static inline int tpause(long long tsc, long long step)
 {
   int i, loops;
   long sleep;
-  loops = (step / 100000) + 1; /*max sleeptime=100000*/
+  /* maximum sleep time for tpause is 100000 */
+  loops = (step / 100000) + 1;
   sleep = (step / loops);
   for (i = 1; i < loops; i++)
   {
@@ -602,8 +603,7 @@ int main(int argc, char *argv[])
       start_ticks += nsec_ticks;
       refreshmem(iptr, s);
       tpause(last_ticks, nsec_ticks - shift);
-      while (start_ticks > __rdtsc())
-        ;
+      while (start_ticks > __rdtsc());
       snd_pcm_mmap_commit(pcm_handle, offset, frames);
       icount += s;
       ocount += s;

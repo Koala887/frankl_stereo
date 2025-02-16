@@ -95,7 +95,8 @@ static inline int tpause(long long tsc, long long step)
 {
   int i, loops;
   long sleep;
-  loops = (step / 100000) + 1; /*max sleeptime=100000*/
+  /* maximum sleep time for tpause is 100000 */
+  loops = (step / 100000) + 1; 
   sleep = (step / loops);
   for (i = 1; i < loops; i++)
   {

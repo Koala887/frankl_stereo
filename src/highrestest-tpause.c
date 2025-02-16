@@ -79,6 +79,7 @@ static inline int tpause(long long tsc, long long step)
 {
   int i, loops;
   long sleep;
+  /* maximum sleep time for tpause is 100000*/
   loops = (step / 100000) + 1;
   sleep = (step / loops);
   for (i = 1; i < loops; i++)
@@ -115,7 +116,7 @@ int main(int argc, char *argv[])
 
   if (argc == 2 && (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0))
   {
-    fprintf(stderr, "Usage: no argument - simple test\n  highresttest intv shift - with statistics\n  intv: interval, shift: delay for more precision\n\n");
+    fprintf(stderr, "Usage: no argument - simple test\n  highresttest intv - with statistics\n  intv: interval\n\n");
     return 0;
   }
 
@@ -138,7 +139,7 @@ int main(int argc, char *argv[])
   if (highresok && argc > 1)
   {
 
-    printf("Measuring actual precision of rdtsc() for 10 seconds ...\n");
+    printf("Measuring actual precision of tpause() for 10 seconds ...\n");
     step = 1000000;
     nloops = 10000;
     shift = 100;
