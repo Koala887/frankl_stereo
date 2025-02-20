@@ -13,7 +13,7 @@ http://www.gnu.org/licenses/gpl.txt for license details.
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
-
+#include <netinet/tcp.h>
 
 /* returns file descriptor for network connection 
    (taken from man page of getaddrinfo)            */
@@ -45,9 +45,16 @@ int fd_net(char *host, char *port) {
         if (sfd == -1)
             continue;
 
-        if (connect(sfd, rp->ai_addr, rp->ai_addrlen) != -1)
+        if (connect(sfd, rp->ai_addr, rp->ai_addrlen) != -1) {
+          /*int flag = 1;
+          int result = setsockopt(sfd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int));    
+          if (result < 0) {
+            fprintf(stderr, "setsockopt TCP_NODELAY failed! \n");
+            exit(101);
+          }*/
+        
             break;                  /* Success */
-
+        }
         close(sfd);
     }
     if (rp == NULL) {               /* No address succeeded */

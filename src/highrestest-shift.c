@@ -155,8 +155,9 @@ int main(int argc, char *argv[])
   printf("monotonic resolution: %ld s %ld ns (%d)\n", res.tv_sec, res.tv_nsec, ret);
 
   ret = clock_gettime(CLOCK_MONOTONIC, &tim);
-  printf("monotonic: %ld s %ld ns (%d)\n", tim.tv_sec, tim.tv_nsec, ret);
   start_ticks = read_tsc();
+  printf("monotonic: %ld s %ld ns (%d)\n", tim.tv_sec, tim.tv_nsec, ret);
+  
   res = ns_to_timespec(ticks_to_ns(start_ticks));
   printf("ticks to monotonic: %ld s %ld ns (%lld ticks)\n", res.tv_sec, res.tv_nsec, start_ticks);
   diff = difftimens(tim, res);
