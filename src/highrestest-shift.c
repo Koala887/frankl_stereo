@@ -191,7 +191,7 @@ int main(int argc, char *argv[])
     for (first = 100, i = 0; i < nloops + 99; i++)
     {
       start_ticks += step_ticks;
-      clock_gettime(MYCLOCK, &res);
+      clock_gettime(CLOCK_MONOTONIC, &res);
       res.tv_nsec = res.tv_nsec+(step/2);
       if (res.tv_nsec > 999999999) {
         res.tv_sec++;
