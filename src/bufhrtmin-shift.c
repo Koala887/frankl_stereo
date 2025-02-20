@@ -121,8 +121,9 @@ int main(int argc, char *argv[])
   long long start_ticks, last_ticks, nsec_ticks;
   void *buf, *iptr, *optr, *max;
   char *port, *inhost, *inport, *outfile, *infile;
+  struct timespec mtime;
   double looperr, extraerr, extrabps, off;
-  struct timespec res;
+
   /* variables for shared memory input */
 
   /* read command line options */
@@ -448,14 +449,15 @@ int main(int argc, char *argv[])
   {
     last_ticks = start_ticks;
     start_ticks += nsec_ticks;
-    refreshmem((char *)optr, wnext);
-    clock_gettime(CLOCK_MONOTONIC, &res);
-    res.tv_nsec = res.tv_nsec+(nsec/10*7);
-    if (res.tv_nsec > 999999999) {
-      res.tv_sec++;
-      res.tv_nsec -= 1000000000;
+
+    clock_gettime(CLOCK_MONOTONIC, &mtime);
+    mtime.tv_nsec += (nsec/10*7);
+    if (mtime.tv_nsec > 999999999) {
+      mtime.tv_sec++;
+      mtime.tv_nsec -= 1000000000;
     }      
-    while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &res, NULL) != 0);
+    refreshmem((char *)optr, wnext);
+    while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &mtime, NULL) != 0);
     while (start_ticks > __rdtsc());
     /* write a chunk, this comes first after waking from sleep */
     s = write(connfd, optr, wnext);

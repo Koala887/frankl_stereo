@@ -46,12 +46,12 @@ int fd_net(char *host, char *port) {
             continue;
 
         if (connect(sfd, rp->ai_addr, rp->ai_addrlen) != -1) {
-          /*int flag = 1;
+          int flag = 1;
           int result = setsockopt(sfd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int));    
           if (result < 0) {
             fprintf(stderr, "setsockopt TCP_NODELAY failed! \n");
             exit(101);
-          }*/
+          }
         
             break;                  /* Success */
         }
