@@ -450,7 +450,7 @@ int main(int argc, char *argv[])
     start_ticks += nsec_ticks;
     refreshmem((char *)optr, wnext);
     clock_gettime(CLOCK_MONOTONIC, &res);
-    res.tv_nsec = res.tv_nsec+(step/10*7);
+    res.tv_nsec = res.tv_nsec+(nsec/10*7);
     if (res.tv_nsec > 999999999) {
       res.tv_sec++;
       res.tv_nsec -= 1000000000;
