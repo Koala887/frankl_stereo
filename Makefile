@@ -17,7 +17,7 @@ CFLAGSNO=-O0 -Wall -z execstack -D_FILE_OFFSET_BITS=64 -fgnu89-inline -mwaitpkg 
 #     bin/resample_soxr bin/cat64 bin/shownfinfo bin/music2nf
 ALL: bin tmp bin/bufhrt bin/bufhrtmin bin/bufhrtmin-tsc bin/highrestest bin/highrestest-tsc bin/bufhrtmin-tpause\
      bin/writeloop bin/catloop bin/playhrt bin/playhrtmin bin/playhrtmin-tsc bin/playhrtmin-tpause\
-	 bin/highrestest-tpause bin/highrestest-shift
+	 bin/highrestest-tpause bin/highrestest-shift bin/bufhrtmin-shift
 
 bin:
 	mkdir -p bin
@@ -135,6 +135,9 @@ bin/bufhrtmin: src/version.h tmp/net.o src/bufhrtmin.c tmp/cprefresh.o tmp/cpref
 
 bin/bufhrtmin-tsc: src/version.h tmp/net.o src/bufhrtmin-tsc.c tmp/cprefresh.o tmp/cprefresh_ass.o |bin
 	$(CC) $(CFLAGSNO) -o bin/bufhrtmin-tsc src/bufhrtmin-tsc.c tmp/net.o tmp/cprefresh.o tmp/cprefresh_ass.o -lpthread -lrt
+
+bin/bufhrtmin-shift: src/version.h tmp/net.o src/bufhrtmin-shift.c tmp/cprefresh.o tmp/cprefresh_ass.o |bin
+	$(CC) $(CFLAGSNO) -o bin/bufhrtmin-shift src/bufhrtmin-shift.c tmp/net.o tmp/cprefresh.o tmp/cprefresh_ass.o -lpthread -lrt
 
 bin/bufhrtmin-tpause: src/version.h tmp/net.o src/bufhrtmin-tpause.c tmp/cprefresh.o tmp/cprefresh_ass.o |bin
 	$(CC) $(CFLAGSNO) -o bin/bufhrtmin-tpause src/bufhrtmin-tpause.c tmp/net.o tmp/cprefresh.o tmp/cprefresh_ass.o -lpthread -lrt
