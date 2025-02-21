@@ -39,8 +39,8 @@ int main(int argc, char *argv[])
   int sfd, s, verbose, nrchannels, startcount,
         stripped, innetbufsize, nrcp, slowcp, k;
   long blen, ilen, olen, extra, loopspersec, sleep,
-      nsec, csec, count;
-  long long icount, ocount;
+      nsec, csec;
+  long long count;
   void *buf, *iptr, *tbuf;
   struct timespec mtime, ctime;
   double looperr, extraerr, extrabps;
@@ -52,7 +52,7 @@ int main(int argc, char *argv[])
   int optc, nonblock, rate, bytespersample, bytesperframe;
   snd_pcm_uframes_t hwbufsize, periodsize, offset, frames;
   snd_pcm_access_t access;
-  snd_pcm_sframes_t avail;
+  
   const snd_pcm_channel_area_t *areas;
 
   /* read command line options */
@@ -285,8 +285,6 @@ int main(int argc, char *argv[])
   else
     looperr = (1.0 * rate) / loopspersec - 1.0 * olen;
   
-  icount = 0;
-  ocount = 0;
   /* for mmap try to set hwbuffer to multiple of output per loop */
   if (access == SND_PCM_ACCESS_MMAP_INTERLEAVED)
   {
@@ -452,37 +450,13 @@ int main(int argc, char *argv[])
     {
       exit(19);
     }
-    for (count = 1; count <= startcount; count++)
-    {
-      /* start playing when half of hwbuffer is filled */
-      if (count == startcount)
-        snd_pcm_start(pcm_handle);
 
-      frames = olen;
-      avail = snd_pcm_avail_update(pcm_handle);
-      snd_pcm_mmap_begin(pcm_handle, &areas, &offset, &frames);
-      ilen = frames * bytesperframe;
-      iptr = areas[0].addr + offset * bytesperframe;
-      memclean(iptr, ilen);
-      s = read(sfd, iptr, ilen);
-      mtime.tv_nsec += nsec;
-      if (mtime.tv_nsec > 999999999)
-      {
-        mtime.tv_nsec -= 1000000000;
-        mtime.tv_sec++;
-      }
-      refreshmem(iptr, s);
-      clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &mtime, NULL);
-      snd_pcm_mmap_commit(pcm_handle, offset, frames);
-      icount += s;
-      ocount += s;
-      if (s == 0) /* done */
-        break;
-    }
     while (1)
     {
+      /* start playing when half of hwbuffer is filled */
+      if (count == startcount)  snd_pcm_start(pcm_handle);      
       frames = olen;
-      avail = snd_pcm_avail_update(pcm_handle);
+      snd_pcm_avail(pcm_handle);
       snd_pcm_mmap_begin(pcm_handle, &areas, &offset, &frames);
       ilen = frames * bytesperframe;
       iptr = areas[0].addr + offset * bytesperframe;
@@ -533,8 +507,7 @@ int main(int argc, char *argv[])
       refreshmem(iptr, s);
       clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &mtime, NULL);
       snd_pcm_mmap_commit(pcm_handle, offset, frames);
-      icount += s;
-      ocount += s;
+      count++;
       if (s == 0) /* done */
         break;
     }

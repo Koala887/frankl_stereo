@@ -380,8 +380,8 @@ int main(int argc, char *argv[])
     int sfd, s, moreinput, err, verbose, nrchannels, startcount, sumavg,
         stripped, innetbufsize, dobufstats, countdelay, maxbad, nrcp, slowcp, k;
     long blen, hlen, ilen, olen, extra, loopspersec, nrdelays, sleep,
-         nsec, csec, count, wnext, badloops, badreads, readmissing, avgav, checkav, shift;
-    long long icount, ocount, badframes, start_ticks, end_ticks, last_ticks,
+         nsec, csec, wnext, badloops, badreads, readmissing, avgav, checkav, shift;
+    long long count, icount, ocount, badframes, start_ticks, end_ticks, last_ticks,
     nsec_ticks, timecheck_ticks, copy_ticks, csec_ticks, sleep_ticks;
     void *buf, *iptr, *optr, *tbuf, *max;
     struct timespec mtime, ctime;
@@ -929,31 +929,11 @@ int main(int argc, char *argv[])
 	 /* get time */
      start_ticks = read_tsc();
 	 
-      for (count=1; count <= startcount; count++) {
+      while (1) {
           /* start playing when half of hwbuffer is filled */
           if (count == startcount)  snd_pcm_start(pcm_handle);
-
           frames = olen;
-          avail = snd_pcm_avail_update(pcm_handle);
-          snd_pcm_mmap_begin(pcm_handle, &areas, &offset, &frames);
-          ilen = frames * bytesperframe;
-          iptr = areas[0].addr + offset * bytesperframe;
-          memclean(iptr, ilen);
-          s = read(sfd, iptr, ilen);
-		  last_ticks = start_ticks;
-          start_ticks += nsec_ticks;
-          refreshmem(iptr, s);
-		  tpause(last_ticks, nsec_ticks-shift);
-          while (start_ticks > __rdtsc());
-          snd_pcm_mmap_commit(pcm_handle, offset, frames);
-          icount += s;
-          ocount += s;
-          if (s == 0) /* done */
-              break;
-      }
-      while (1) {
-          frames = olen;
-          avail = snd_pcm_avail_update(pcm_handle);
+          avail = snd_pcm_avail(pcm_handle);
           snd_pcm_mmap_begin(pcm_handle, &areas, &offset, &frames);
           ilen = frames * bytesperframe;
           iptr = areas[0].addr + offset * bytesperframe;
@@ -985,6 +965,7 @@ int main(int argc, char *argv[])
 		  tpause(last_ticks, nsec_ticks-shift);
           while (start_ticks > read_tsc());
           snd_pcm_mmap_commit(pcm_handle, offset, frames);
+          count++;
           icount += s;
           ocount += s;
           if (s == 0) /* done */
@@ -1006,7 +987,7 @@ int main(int argc, char *argv[])
               frames++;
               off -= 1.0;
           }
-          avail = snd_pcm_avail_update(pcm_handle);
+          avail = snd_pcm_avail(pcm_handle);
           snd_pcm_mmap_begin(pcm_handle, &areas, &offset, &frames);
           ilen = frames * bytesperframe;
           iptr = areas[0].addr + offset * bytesperframe;
@@ -1065,7 +1046,7 @@ int main(int argc, char *argv[])
               frames++;
               off -= 1.0;
           }
-          avail = snd_pcm_avail_update(pcm_handle);
+          avail = snd_pcm_avail(pcm_handle);
           err = snd_pcm_mmap_begin(pcm_handle, &areas, &offset, &frames);
           if (err < 0) {
               fprintf(stderr, "playhrt: Don't get mmap address.\n");

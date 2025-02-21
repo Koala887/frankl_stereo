@@ -802,7 +802,7 @@ int main(int argc, char *argv[])
           if (count == startcount)  snd_pcm_start(pcm_handle);
 
           frames = olen;
-          avail = snd_pcm_avail_update(pcm_handle);
+          avail = snd_pcm_avail(pcm_handle);
           snd_pcm_mmap_begin(pcm_handle, &areas, &offset, &frames);
           ilen = frames * bytesperframe;
           iptr = areas[0].addr + offset * bytesperframe;
@@ -823,7 +823,7 @@ int main(int argc, char *argv[])
       }
       while (1) {
           frames = olen;
-          avail = snd_pcm_avail_update(pcm_handle);
+          avail = snd_pcm_avail(pcm_handle);
           snd_pcm_mmap_begin(pcm_handle, &areas, &offset, &frames);
           ilen = frames * bytesperframe;
           iptr = areas[0].addr + offset * bytesperframe;
@@ -887,7 +887,7 @@ int main(int argc, char *argv[])
               frames++;
               off -= 1.0;
           }
-          avail = snd_pcm_avail_update(pcm_handle);
+          avail = snd_pcm_avail(pcm_handle);
           snd_pcm_mmap_begin(pcm_handle, &areas, &offset, &frames);
           ilen = frames * bytesperframe;
           iptr = areas[0].addr + offset * bytesperframe;
@@ -959,7 +959,7 @@ int main(int argc, char *argv[])
               frames++;
               off -= 1.0;
           }
-          avail = snd_pcm_avail_update(pcm_handle);
+          avail = snd_pcm_avail(pcm_handle);
           err = snd_pcm_mmap_begin(pcm_handle, &areas, &offset, &frames);
           if (err < 0) {
               fprintf(stderr, "playhrt: Don't get mmap address.\n");
