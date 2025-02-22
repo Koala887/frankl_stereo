@@ -109,6 +109,19 @@ static inline int tpause(long long end)
   return (0);
 }
 
+static inline int sleep_ns(int step)
+{
+  struct timespec mtime;
+  clock_gettime(CLOCK_MONOTONIC, &mtime);
+  mtime.tv_nsec += (step);
+  if (mtime.tv_nsec > 999999999) {
+    mtime.tv_sec++;
+    mtime.tv_nsec -= 1000000000;
+  }      
+  while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &mtime, NULL) != 0);
+  return (0);
+}
+
 long long ticks_to_ns(long long ticks)
 {
   __uint128_t x = ticks;
@@ -562,23 +575,25 @@ int main(int argc, char *argv[])
       if (s == 0) /* done */
         break;      
       if (slowcp) {
-          tbufs[0] = iptr;
-          tbufs[nrcp] = iptr;
-          for (k=1; k <= nrcp; k++) {
-              /* short active pause before before cprefresh
-                 (too short for sleeps) */
-              nsloop(csec);
-              memclean((char*)(tbufs[k]), ilen);
-              cprefresh((char*)(tbufs[k]), (char*)(tbufs[k-1]), ilen);
-              memclean((char*)(tbufs[k-1]), ilen);
-          }
+        copy_ticks = start_ticks + (nsec_ticks/8*6);
+        tbufs[0] = iptr;
+        tbufs[nrcp] = iptr;
+        for (k=1; k <= nrcp; k++) {
+          /* short active pause before before cprefresh
+            (too short for sleeps) */
+          copy_ticks += csec_ticks;
+          tpause(copy_ticks);
+          memclean((char*)(tbufs[k]), ilen);
+          cprefresh((char*)(tbufs[k]), (char*)(tbufs[k-1]), ilen);
+          memclean((char*)(tbufs[k-1]), ilen);
+        }
       } else {
-          for (k=nrcp; k; k--) {
-              memclean((char*)tbuf, ilen);
-              cprefresh((char*)tbuf, (char*)iptr, ilen);
-              memclean((char*)iptr, ilen);
-              cprefresh((char*)iptr, (char*)tbuf, ilen);
-          }
+        for (k=nrcp; k; k--) {
+          memclean((char*)tbuf, ilen);
+          cprefresh((char*)tbuf, (char*)iptr, ilen);
+          memclean((char*)iptr, ilen);
+          cprefresh((char*)iptr, (char*)tbuf, ilen);
+        }
       }
 
       start_ticks += nsec_ticks;
