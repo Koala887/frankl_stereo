@@ -93,6 +93,19 @@ static inline int tpause(long long end)
   return (0);
 }
 
+static inline int sleep_ns(int step)
+{
+  struct timespec mtime;
+  clock_gettime(CLOCK_MONOTONIC, &mtime);
+  mtime.tv_nsec += (step);
+  if (mtime.tv_nsec > 999999999) {
+    mtime.tv_sec++;
+    mtime.tv_nsec -= 1000000000;
+  }      
+  while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &mtime, NULL) != 0);
+  return (0);
+}
+
 long ticks_to_ns(long ticks)
 {
   __uint128_t x = ticks;
@@ -158,8 +171,8 @@ int main(int argc, char *argv[])
     dev = 0;
     // calculate ticks per step
     step_ticks = ns_to_ticks(step);
-    for (i = 0; i < 21; count[i] = 0, i++)
-      ;
+    for (i = 0; i < 21; count[i] = 0, i++);
+
     start_ticks = read_tsc();
     last_ticks = start_ticks;
 
@@ -167,6 +180,7 @@ int main(int argc, char *argv[])
     for (first = 100, i = 0; i < nloops + 99; i++)
     {
       start_ticks += step_ticks;
+      sleep_ns(step/4*3);
       tpause(start_ticks - shift);
       do
       {
@@ -174,15 +188,8 @@ int main(int argc, char *argv[])
       } while (start_ticks > end_ticks);
 
       d = (ticks_to_ns(end_ticks - last_ticks) - step);
-
       last_ticks = end_ticks;
-      clock_gettime(CLOCK_MONOTONIC, &mtime);
-      mtime.tv_nsec += (step/2);
-      if (mtime.tv_nsec > 999999999) {
-        mtime.tv_sec++;
-        mtime.tv_nsec -= 1000000000;
-      }      
-      while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &mtime, NULL) != 0);
+
       // printf("%ld\n", d);
       if (first == 0)
       {

@@ -91,10 +91,13 @@ static inline unsigned long long read_tsc(void)
   return (tsc);
 }
 
-static inline int tpause(long long tsc, long long step)
+static inline int tpause(long long end)
 {
   int i, loops;
   long sleep;
+  long long tsc = read_tsc();
+  if (tsc > end) return (0);
+  long step = (end - tsc);
   /* maximum sleep time for tpause is 100000 */
   loops = (step / 100000) + 1;
   sleep = (step / loops);
@@ -102,7 +105,7 @@ static inline int tpause(long long tsc, long long step)
   {
     _tpause(1, (tsc + (i * sleep)));
   }
-  _tpause(0, tsc + step);
+  _tpause(1, end);
   return (0);
 }
 
@@ -130,7 +133,7 @@ int main(int argc, char *argv[])
       nsec, csec, shift;
 
   long long count, start_ticks, last_ticks, nsec_ticks, copy_ticks, csec_ticks, sleep_ticks;
-  void *buf, *iptr, *tbuf;
+  void *buf, *iptr, *tbuf, *tbufs[1024];
   double looperr, extraerr, extrabps;
   snd_pcm_t *pcm_handle;
   snd_pcm_hw_params_t *hwparams;
@@ -366,12 +369,15 @@ int main(int argc, char *argv[])
     else
       ilen = bytesperframe * (olen + 1);
   }
-  /* temporary buffer */
-  tbuf = NULL;
-  if (posix_memalign(&tbuf, 4096, 2 * olen * bytesperframe))
-  {
-    exit(6);
+
+  /* temporary buffers */
+  for (i=1; i < nrcp; i++) {
+      if (posix_memalign(tbufs+i, 4096, 2*olen*bytesperframe)) {
+          fprintf(stderr, "myplayhrt: Cannot allocate buffer for cleaning.\n");
+          exit(2);
+      }
   }
+  tbuf = tbufs[1];
 
   /* need big enough input buffer */
   if (blen < 3 * ilen)
@@ -503,7 +509,7 @@ int main(int argc, char *argv[])
   {
     sleep_ticks = ns_to_ticks(sleep * 1000);
 
-    tpause(start_ticks, sleep_ticks);
+    tpause(start_ticks + sleep_ticks);
 
     /* waits until pipeline is filled */
   }
@@ -522,7 +528,7 @@ int main(int argc, char *argv[])
     /* now sleep until the pipeline is filled */
     sleep = (long)((fcntl(sfd, F_GETPIPE_SZ) / bytesperframe) * 1000000.0 / rate); /* us */
     sleep_ticks = ns_to_ticks(sleep * 1000);
-    tpause(start_ticks, sleep_ticks);
+    tpause(start_ticks + sleep_ticks);
   }
 
   /**********************************************************************/
@@ -542,47 +548,46 @@ int main(int argc, char *argv[])
     while (1)
     {
       /* start playing when half of hwbuffer is filled */
-      if (count == startcount)  snd_pcm_start(pcm_handle);      
+      if (count == startcount)  snd_pcm_start(pcm_handle);
+
       frames = olen;
+      sleep_ns(nsec/2);
+      tpause(start_ticks + (nsec_ticks/8*5));
       snd_pcm_avail(pcm_handle);
       snd_pcm_mmap_begin(pcm_handle, &areas, &offset, &frames);
       ilen = frames * bytesperframe;
       iptr = areas[0].addr + offset * bytesperframe;
       memclean(iptr, ilen);
       s = read(sfd, iptr, ilen);
-      if (slowcp)
-      {
-        copy_ticks = start_ticks;
-        for (k = nrcp; k; k--)
-        {
-          tpause(copy_ticks, csec_ticks);
-          memclean((char *)tbuf, ilen);
-          cprefresh((char *)tbuf, (char *)iptr, ilen);
-          copy_ticks += csec_ticks;
-          tpause(copy_ticks, csec_ticks);
-          memclean((char *)iptr, ilen);
-          cprefresh((char *)iptr, (char *)tbuf, ilen);
-        }
+      if (s == 0) /* done */
+        break;      
+      if (slowcp) {
+          tbufs[0] = iptr;
+          tbufs[nrcp] = iptr;
+          for (k=1; k <= nrcp; k++) {
+              /* short active pause before before cprefresh
+                 (too short for sleeps) */
+              nsloop(csec);
+              memclean((char*)(tbufs[k]), ilen);
+              cprefresh((char*)(tbufs[k]), (char*)(tbufs[k-1]), ilen);
+              memclean((char*)(tbufs[k-1]), ilen);
+          }
+      } else {
+          for (k=nrcp; k; k--) {
+              memclean((char*)tbuf, ilen);
+              cprefresh((char*)tbuf, (char*)iptr, ilen);
+              memclean((char*)iptr, ilen);
+              cprefresh((char*)iptr, (char*)tbuf, ilen);
+          }
       }
-      else
-      {
-        for (k = nrcp; k; k--)
-        {
-          memclean((char *)tbuf, ilen);
-          cprefresh((char *)tbuf, (char *)iptr, ilen);
-          memclean((char *)iptr, ilen);
-          cprefresh((char *)iptr, (char *)tbuf, ilen);
-        }
-      }
-      last_ticks = start_ticks;
+
       start_ticks += nsec_ticks;
-      refreshmem(iptr, s);
-      tpause(last_ticks, nsec_ticks - shift);
+
+      tpause(start_ticks - shift);
       while (start_ticks > __rdtsc());
       snd_pcm_mmap_commit(pcm_handle, offset, frames);
       count++;
-      if (s == 0) /* done */
-        break;
+
     }
   }
   /* cleanup network connection and sound device */
