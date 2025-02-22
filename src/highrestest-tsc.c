@@ -75,17 +75,21 @@ static inline unsigned long long read_tsc(void)
   return (tsc);
 }
 
-static inline int tpause(long long tsc, long long step)
+static inline int tpause(long long end)
 {
   int i, loops;
   long sleep;
+  long long tsc = read_tsc();
+  if (tsc > end) return (0);
+  long step = (end - tsc);
+  /* maximum sleep time for tpause is 100000 */
   loops = (step / 100000) + 1;
   sleep = (step / loops);
   for (i = 1; i < loops; i++)
   {
     _tpause(1, (tsc + (i * sleep)));
   }
-  _tpause(0, tsc + step);
+  _tpause(1, end);
   return (0);
 }
 
@@ -162,8 +166,8 @@ int main(int argc, char *argv[])
     /* avoid some startup jitter */
     for (first = 100, i = 0; i < nloops + 99; i++)
     {
-      tpause(start_ticks, step_ticks - shift);
       start_ticks += step_ticks;
+      tpause(start_ticks - shift);
       do
       {
         end_ticks = __rdtsc();

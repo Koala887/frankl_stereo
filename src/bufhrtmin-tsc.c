@@ -94,18 +94,21 @@ static inline unsigned long long read_tsc(void)
   return (tsc);
 }
 
-static inline int tpause(long long tsc, long long step)
+static inline int tpause(long long end)
 {
   int i, loops;
   long sleep;
-    /* maximum sleep time for tpause is 100000 */
+  long long tsc = read_tsc();
+  if (tsc > end) return (0);
+  long step = (end - tsc);
+  /* maximum sleep time for tpause is 100000 */
   loops = (step / 100000) + 1;
   sleep = (step / loops);
   for (i = 1; i < loops; i++)
   {
     _tpause(1, (tsc + (i * sleep)));
   }
-  _tpause(0, tsc + step);
+  _tpause(1, end);
   return (0);
 }
 
@@ -460,12 +463,11 @@ int main(int argc, char *argv[])
 
   for (count = 1, off = looperr; 1; count++, off += looperr)
   {
-    last_ticks = start_ticks;
     start_ticks += nsec_ticks;
     refreshmem((char *)optr, wnext);
-    tpause(last_ticks, nsec_ticks - shift);
-    while (start_ticks > __rdtsc())
-      ;
+    tpause(start_ticks - shift);
+    while (start_ticks > __rdtsc());
+    
     /* write a chunk, this comes first after waking from sleep */
     s = write(connfd, optr, wnext);
     if (s < 0)
