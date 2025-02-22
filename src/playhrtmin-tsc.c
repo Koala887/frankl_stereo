@@ -141,11 +141,11 @@ long ns_to_ticks(long ns)
 int main(int argc, char *argv[])
 {
   int sfd, s, nrchannels, startcount,
-      stripped, innetbufsize, nrcp, slowcp, k;
+      stripped, innetbufsize, nrcp, slowcp, k, i;
   long blen, ilen, olen, extra, loopspersec, sleep,
       nsec, csec, shift;
 
-  long long count, start_ticks, last_ticks, nsec_ticks, copy_ticks, csec_ticks, sleep_ticks;
+  long long count, start_ticks, nsec_ticks, copy_ticks, csec_ticks, sleep_ticks;
   void *buf, *iptr, *tbuf, *tbufs[1024];
   double looperr, extraerr, extrabps;
   snd_pcm_t *pcm_handle;
