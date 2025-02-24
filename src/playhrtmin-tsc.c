@@ -368,7 +368,7 @@ int main(int argc, char *argv[])
 
   if (slowcp)
   {
-    csec = nsec / (4 * nrcp);
+    csec = nsec / (8 * nrcp);
     csec_ticks = ns_to_ticks(csec);
   }
   /* olen in frames written per loop */
