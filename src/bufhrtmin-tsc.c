@@ -215,7 +215,7 @@ int main(int argc, char *argv[])
   nrcp = 0;
   innetbufsize = 0;
   outnetbufsize = 0;
-  shift = 100;
+  shift = 500;
   while ((optc = getopt_long(argc, argv, "p:o:b:i:D:n:m:X:Y:s:f:F:R:c:H:P:e:x:vVIhd",
                              longoptions, &optind)) != -1)
   {

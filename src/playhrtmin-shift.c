@@ -220,7 +220,7 @@ int main(int argc, char *argv[])
   sleep = 0;
   nonblock = 0;
   innetbufsize = 0;
-  shift = 500;
+  shift = 100000;
   stripped = 1;
   while ((optc = getopt_long(argc, argv, "r:p:Sb:D:i:n:s:f:k:Mc:P:d:R:Ce:x:m:K:o:NXO:vyjVh",
                              longoptions, &optind)) != -1)
@@ -564,8 +564,7 @@ int main(int argc, char *argv[])
       if (count == startcount)  snd_pcm_start(pcm_handle);
 
       frames = olen;
-      sleep_ns(nsec/2);
-      tpause(start_ticks + (nsec_ticks/8*5));
+      sleep_ns(nsec-shift);
       snd_pcm_avail(pcm_handle);
       snd_pcm_mmap_begin(pcm_handle, &areas, &offset, &frames);
       ilen = frames * bytesperframe;
@@ -574,35 +573,11 @@ int main(int argc, char *argv[])
       s = read(sfd, iptr, ilen);
       if (s == 0) /* done */
         break;      
-      if (slowcp) {
-        copy_ticks = start_ticks + (nsec_ticks/8*6);
-        tbufs[0] = iptr;
-        tbufs[nrcp] = iptr;
-        for (k=1; k <= nrcp; k++) {
-          /* short active pause before before cprefresh
-            (too short for sleeps) */
-          copy_ticks += csec_ticks;
-          tpause(copy_ticks);
-          memclean((char*)(tbufs[k]), ilen);
-          cprefresh((char*)(tbufs[k]), (char*)(tbufs[k-1]), ilen);
-          memclean((char*)(tbufs[k-1]), ilen);
-        }
-      } else {
-        for (k=nrcp; k; k--) {
-          memclean((char*)tbuf, ilen);
-          cprefresh((char*)tbuf, (char*)iptr, ilen);
-          memclean((char*)iptr, ilen);
-          cprefresh((char*)iptr, (char*)tbuf, ilen);
-        }
-      }
 
       start_ticks += nsec_ticks;
-
-      tpause(start_ticks - shift);
       while (start_ticks > __rdtsc());
       snd_pcm_mmap_commit(pcm_handle, offset, frames);
       count++;
-
     }
   }
   /* cleanup network connection and sound device */

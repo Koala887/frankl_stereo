@@ -65,20 +65,7 @@ long long get_tsc_freq(void)
   x += 1;
   return (x);
 }
-/* timestruct to nanoseconds */
-long long timespec_to_ns(struct timespec t1)
-{ 
-   return (t1.tv_sec*1000000000ull + t1.tv_nsec);
-}
 
-/* nanoseconds to timestruct */
-struct timespec ns_to_timespec(long long ns)
-{ 
-  struct timespec t1;
-  t1.tv_sec  = ns / 1000000000ull;
-  t1.tv_nsec = ns % 1000000000ull;
-  return (t1);
-}
 /* t2 - t1 in nanoseconds */
 long difftimens(struct timespec t1, struct timespec t2)
 { 
@@ -97,17 +84,16 @@ static inline unsigned long long read_tsc(void)
   return (tsc);
 }
 
-static inline int tpause(long long tsc, long long step)
+static inline int sleep_ns(int step)
 {
-  int i, loops;
-  long sleep;
-  loops = (step / 100000) + 1;
-  sleep = (step / loops);
-  for (i = 1; i < loops; i++)
-  {
-    _tpause(1, (tsc + (i * sleep)));
-  }
-  _tpause(0, tsc + step);
+  struct timespec mtime;
+  clock_gettime(CLOCK_MONOTONIC, &mtime);
+  mtime.tv_nsec += (step);
+  if (mtime.tv_nsec > 999999999) {
+    mtime.tv_sec++;
+    mtime.tv_nsec -= 1000000000;
+  }      
+  while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &mtime, NULL) != 0);
   return (0);
 }
 
@@ -155,25 +141,20 @@ int main(int argc, char *argv[])
   printf("monotonic resolution: %ld s %ld ns (%d)\n", res.tv_sec, res.tv_nsec, ret);
 
   ret = clock_gettime(CLOCK_MONOTONIC, &tim);
-  start_ticks = read_tsc();
+
   printf("monotonic: %ld s %ld ns (%d)\n", tim.tv_sec, tim.tv_nsec, ret);
   
-  res = ns_to_timespec(ticks_to_ns(start_ticks));
-  printf("ticks to monotonic: %ld s %ld ns (%lld ticks)\n", res.tv_sec, res.tv_nsec, start_ticks);
-  diff = difftimens(tim, res);
-  printf("TSC Differency: %ld ns\n", diff);
-
   if (highresok && argc > 1)
   {
 
     printf("Measuring actual precision of rdtsc() for 10 seconds ...\n");
     step = 1000000;
     nloops = 10000;
-    shift = 100;
+    shift = 10000;
     if (argc > 2)
       shift = atoi(argv[2]);
     if (shift <= 0)
-      shift = 100;
+      shift = 10000;
     dint = atoi(argv[1]);
     if (dint <= 0)
       dint = 500;
@@ -191,13 +172,7 @@ int main(int argc, char *argv[])
     for (first = 100, i = 0; i < nloops + 99; i++)
     {
       start_ticks += step_ticks;
-      clock_gettime(CLOCK_MONOTONIC, &res);
-      res.tv_nsec = res.tv_nsec+(step/10*7);
-      if (res.tv_nsec > 999999999) {
-        res.tv_sec++;
-        res.tv_nsec -= 1000000000;
-      }      
-      while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &res, NULL) != 0);
+      sleep_ns(step-shift);
       do
       {
         end_ticks = __rdtsc();
@@ -240,11 +215,7 @@ int main(int argc, char *argv[])
       printf("    %d*%ld        %ld\n", i, dint, count[i + 10]);
     printf(" >  10*%ld        %ld\n", dint, count[20]);
   }
-  ret = clock_gettime(CLOCK_MONOTONIC, &tim);
-  start_ticks = read_tsc();
-  res = ns_to_timespec(ticks_to_ns(start_ticks));
-  diff = difftimens(tim, res);
-  printf("TSC Differency: %ld ns\n", diff);
+
   if (highresok)
     printf("\nHighres timer seems enabled!\n");
   else
