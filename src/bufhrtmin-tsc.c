@@ -215,7 +215,7 @@ int main(int argc, char *argv[])
   nrcp = 0;
   innetbufsize = 0;
   outnetbufsize = 0;
-  shift = 500;
+  shift = 5000;
   while ((optc = getopt_long(argc, argv, "p:o:b:i:D:n:m:X:Y:s:f:F:R:c:H:P:e:x:vVIhd",
                              longoptions, &optind)) != -1)
   {
@@ -478,8 +478,8 @@ int main(int argc, char *argv[])
   {
     start_ticks += nsec_ticks;
     sleep_ns(nsec/4*3);
-    refreshmem((char *)optr, wnext);
     tpause(start_ticks - shift);
+    refreshmem((char *)optr, wnext);
     while (start_ticks > __rdtsc());
 
     /* write a chunk, this comes first after waking from sleep */

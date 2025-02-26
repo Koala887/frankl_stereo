@@ -158,11 +158,11 @@ int main(int argc, char *argv[])
     printf("Measuring actual precision of rdtsc() for 10 seconds ...\n");
     step = 1000000;
     nloops = 10000;
-    shift = 100;
+    shift = 1000;
     if (argc > 2)
       shift = atoi(argv[2]);
     if (shift <= 0)
-      shift = 100;
+      shift = 1000;
     dint = atoi(argv[1]);
     if (dint <= 0)
       dint = 500;

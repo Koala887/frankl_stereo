@@ -220,7 +220,7 @@ int main(int argc, char *argv[])
   sleep = 0;
   nonblock = 0;
   innetbufsize = 0;
-  shift = 500;
+  shift = 1000;
   stripped = 1;
   while ((optc = getopt_long(argc, argv, "r:p:Sb:D:i:n:s:f:k:Mc:P:d:R:Ce:x:m:K:o:NXO:vyjVh",
                              longoptions, &optind)) != -1)
@@ -564,8 +564,6 @@ int main(int argc, char *argv[])
       if (count == startcount)  snd_pcm_start(pcm_handle);
 
       frames = olen;
-      sleep_ns(nsec/2);
-      tpause(start_ticks + (nsec_ticks/8*5));
       snd_pcm_avail(pcm_handle);
       snd_pcm_mmap_begin(pcm_handle, &areas, &offset, &frames);
       ilen = frames * bytesperframe;
@@ -574,6 +572,7 @@ int main(int argc, char *argv[])
       s = read(sfd, iptr, ilen);
       if (s == 0) /* done */
         break;      
+      sleep_ns(nsec/2);
       if (slowcp) {
         copy_ticks = start_ticks + (nsec_ticks/8*6);
         tbufs[0] = iptr;
@@ -581,11 +580,11 @@ int main(int argc, char *argv[])
         for (k=1; k <= nrcp; k++) {
           /* short active pause before before cprefresh
             (too short for sleeps) */
-          copy_ticks += csec_ticks;
           tpause(copy_ticks);
           memclean((char*)(tbufs[k]), ilen);
           cprefresh((char*)(tbufs[k]), (char*)(tbufs[k-1]), ilen);
           memclean((char*)(tbufs[k-1]), ilen);
+          copy_ticks += csec_ticks;
         }
       } else {
         for (k=nrcp; k; k--) {
