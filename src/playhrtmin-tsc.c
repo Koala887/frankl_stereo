@@ -109,19 +109,6 @@ static inline int tpause(long long end)
   return (0);
 }
 
-static inline int sleep_ns(int step)
-{
-  struct timespec mtime;
-  clock_gettime(CLOCK_MONOTONIC, &mtime);
-  mtime.tv_nsec += (step);
-  if (mtime.tv_nsec > 999999999) {
-    mtime.tv_sec++;
-    mtime.tv_nsec -= 1000000000;
-  }      
-  while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &mtime, NULL) != 0);
-  return (0);
-}
-
 long long ticks_to_ns(long long ticks)
 {
   __uint128_t x = ticks;
@@ -157,6 +144,7 @@ int main(int argc, char *argv[])
   snd_pcm_uframes_t hwbufsize, periodsize, offset, frames;
   snd_pcm_access_t access;
   const snd_pcm_channel_area_t *areas;
+  struct timespec mtime;
 
   /* read command line options */
   static struct option longoptions[] = {
@@ -556,6 +544,7 @@ int main(int argc, char *argv[])
        offset and statistics code removed */
     startcount = hwbufsize / (2 * olen);
     /* get time */
+    clock_gettime(CLOCK_MONOTONIC, &mtime);
     start_ticks = read_tsc();
 
     while (1)
@@ -572,7 +561,14 @@ int main(int argc, char *argv[])
       s = read(sfd, iptr, ilen);
       if (s == 0) /* done */
         break;      
-      sleep_ns(nsec/2);
+
+      mtime.tv_nsec += (nsec/2);
+      if (mtime.tv_nsec > 999999999) {
+        mtime.tv_sec++;
+        mtime.tv_nsec -= 1000000000;
+      }      
+      while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &mtime, NULL) != 0);
+
       if (slowcp) {
         copy_ticks = start_ticks + (nsec_ticks/8*6);
         tbufs[0] = iptr;
@@ -600,6 +596,7 @@ int main(int argc, char *argv[])
       tpause(start_ticks - shift);
       while (start_ticks > __rdtsc());
       snd_pcm_mmap_commit(pcm_handle, offset, frames);
+      clock_gettime(CLOCK_MONOTONIC, &mtime);
       count++;
 
     }

@@ -112,19 +112,6 @@ static inline int tpause(long long end)
   return (0);
 }
 
-static inline int sleep_ns(int step)
-{
-  struct timespec mtime;
-  clock_gettime(CLOCK_MONOTONIC, &mtime);
-  mtime.tv_nsec += (step);
-  if (mtime.tv_nsec > 999999999) {
-    mtime.tv_sec++;
-    mtime.tv_nsec -= 1000000000;
-  }      
-  while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &mtime, NULL) != 0);
-  return (0);
-}
-
 long long ticks_to_ns(long long ticks)
 {
   __uint128_t x = ticks;
@@ -153,6 +140,7 @@ int main(int argc, char *argv[])
   void *buf, *iptr, *optr, *max;
   char *port, *inhost, *inport, *outfile, *infile;
   double looperr, extraerr, extrabps, off;
+  struct timespec mtime;
   /* variables for shared memory input */
 
   /* read command line options */
@@ -470,20 +458,28 @@ int main(int argc, char *argv[])
     wnext = iptr - optr;
   else
     wnext = olen;
-
+  /* get time */  
+  clock_gettime(CLOCK_MONOTONIC, &mtime);
   start_ticks = read_tsc();
   /* main loop */
 
   for (count = 1, off = looperr; 1; count++, off += looperr)
   {
     start_ticks += nsec_ticks;
-    sleep_ns(nsec/4*3);
+      
+    mtime.tv_nsec += (nsec/4*3);
+    if (mtime.tv_nsec > 999999999) {
+      mtime.tv_sec++;
+      mtime.tv_nsec -= 1000000000;
+    }      
+    while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &mtime, NULL) != 0);
     tpause(start_ticks - shift);
     refreshmem((char *)optr, wnext);
     while (start_ticks > __rdtsc());
 
     /* write a chunk, this comes first after waking from sleep */
     s = write(connfd, optr, wnext);
+    clock_gettime(CLOCK_MONOTONIC, &mtime);
     if (s < 0)
     {
       exit(15);
