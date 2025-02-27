@@ -203,7 +203,7 @@ int main(int argc, char *argv[])
   nrcp = 0;
   innetbufsize = 0;
   outnetbufsize = 0;
-  shift = 5000;
+  shift = 1000;
   while ((optc = getopt_long(argc, argv, "p:o:b:i:D:n:m:X:Y:s:f:F:R:c:H:P:e:x:vVIhd",
                              longoptions, &optind)) != -1)
   {
@@ -467,14 +467,15 @@ int main(int argc, char *argv[])
   {
     start_ticks += nsec_ticks;
       
-    mtime.tv_nsec += (nsec/4*3);
+    mtime.tv_nsec += (nsec-150000);
     if (mtime.tv_nsec > 999999999) {
       mtime.tv_sec++;
       mtime.tv_nsec -= 1000000000;
-    }      
+    }
+    refreshmem((char *)optr, wnext);      
     while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &mtime, NULL) != 0);
-    tpause(start_ticks - shift);
-    refreshmem((char *)optr, wnext);
+    _tpause(start_ticks - 100000);
+    _tpause(start_ticks - shift);
     while (start_ticks > __rdtsc());
 
     /* write a chunk, this comes first after waking from sleep */

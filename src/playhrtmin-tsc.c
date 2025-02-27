@@ -358,6 +358,7 @@ int main(int argc, char *argv[])
   {
     csec = nsec / (8 * nrcp);
     csec_ticks = ns_to_ticks(csec);
+	if (csec_ticks > 100000) csec_ticks = 100000;
   }
   /* olen in frames written per loop */
   olen = rate / loopspersec;
@@ -563,14 +564,14 @@ int main(int argc, char *argv[])
         break;      
 
       if (slowcp) {
-        copy_ticks = start_ticks;
+        copy_ticks = read_tsc();
         tbufs[0] = iptr;
         tbufs[nrcp] = iptr;
         for (k=1; k <= nrcp; k++) {
           /* short active pause before before cprefresh
             (too short for sleeps) */
           copy_ticks += csec_ticks;
-          tpause(copy_ticks);
+          _tpause(1, copy_ticks);
           memclean((char*)(tbufs[k]), ilen);
           cprefresh((char*)(tbufs[k]), (char*)(tbufs[k-1]), ilen);
           memclean((char*)(tbufs[k-1]), ilen);
@@ -583,16 +584,17 @@ int main(int argc, char *argv[])
           cprefresh((char*)iptr, (char*)tbuf, ilen);
         }
       }
-      mtime.tv_nsec += (nsec/4*3);
+	  start_ticks += nsec_ticks;
+      mtime.tv_nsec += (nsec-150000);
       if (mtime.tv_nsec > 999999999) {
         mtime.tv_sec++;
         mtime.tv_nsec -= 1000000000;
       }      
       while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &mtime, NULL) != 0);
 
-      start_ticks += nsec_ticks;
-
-      tpause(start_ticks - shift);
+      
+      _tpause(start_ticks - 100000);
+      _tpause(start_ticks - shift);
       while (start_ticks > __rdtsc());
       snd_pcm_mmap_commit(pcm_handle, offset, frames);
       clock_gettime(CLOCK_MONOTONIC, &mtime);
