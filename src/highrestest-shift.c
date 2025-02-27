@@ -1,8 +1,8 @@
 /*
 highrestest.c                Copyright frankl 2013-2024
 
-This file is part of frankl's stereo utilities.
-See the file License.txt of the distribution and
+This file is part of frankl's stereo utilities. 
+See the file License.txt of the distribution and 
 http://www.gnu.org/licenses/gpl.txt for license details.
 */
 #include <asm/unistd.h>
@@ -19,6 +19,9 @@ http://www.gnu.org/licenses/gpl.txt for license details.
 #include <emmintrin.h>
 #include <x86intrin.h>
 #include <x86gprintrin.h>
+
+//#define MYCLOCK CLOCK_MONOTONIC_RAW
+#define MYCLOCK CLOCK_MONOTONIC
 
 long long tsc_freq_hz;
 
@@ -55,14 +58,31 @@ long long get_tsc_freq(void)
     fprintf(stderr, "Perf system doesn't support user time\n");
     return 1;
   }
-  printf("TSC-Mult: %u \n", pc->time_mult);
-  printf("TSC-Shift: %u \n", pc->time_shift);
+  //printf("TSC-Mult: %u \n", pc->time_mult);
+  //printf("TSC-Shift: %u \n", pc->time_shift);
   close(fd);
 
   __uint128_t x = 1000000000ull;
   x <<= pc->time_shift;
   x /= pc->time_mult;
   x += 1;
+  return (x);
+}
+
+static inline unsigned long long read_tsc(void)
+{
+  unsigned long long tsc;
+  _mm_lfence();
+  tsc = __rdtsc();
+  _mm_lfence();
+  return (tsc);
+}
+
+long ns_to_ticks(long ns)
+{
+  __uint128_t x = ns;
+  x *= tsc_freq_hz;
+  x /= 1000000000ull;
   return (x);
 }
 
@@ -75,56 +95,23 @@ long difftimens(struct timespec t1, struct timespec t2)
    return (long)(l2-l1);
 }
 
-static inline unsigned long long read_tsc(void)
+static inline long nsloop(long cnt)
 {
-  unsigned long long tsc;
-  _mm_lfence();
-  tsc = __rdtsc();
-  _mm_lfence();
-  return (tsc);
-}
-
-static inline int sleep_ns(int step)
-{
-  struct timespec mtime;
-  clock_gettime(CLOCK_MONOTONIC, &mtime);
-  mtime.tv_nsec += (step);
-  if (mtime.tv_nsec > 999999999) {
-    mtime.tv_sec++;
-    mtime.tv_nsec -= 1000000000;
-  }      
-  while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &mtime, NULL) != 0);
-  return (0);
-}
-
-long ticks_to_ns(long ticks)
-{
-  __uint128_t x = ticks;
-  x *= 1000000000ull;
-  x /= tsc_freq_hz;
-  return (x);
-}
-
-long ns_to_ticks(long ns)
-{
-  __uint128_t x = ns;
-  x *= tsc_freq_hz;
-  x /= 1000000000ull;
-  return (x);
+  long long tsc = read_tsc();
+  long long end = tsc + ns_to_ticks(cnt);
+  while (end > __rdtsc());
+  return 0;
 }
 
 /* a simple test of the resolution of several CLOCKs */
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
   int ret, highresok, first, nloops, i, k, shift;
-  long step, d, min, max, dev, dint, count[21], diff;
-  struct timespec res, tim;
-  long long start_ticks, end_ticks, last_ticks, step_ticks;
+  long step, d, min, max, dev, dint, count[21];
+  struct timespec res, last, tim, ttime;
 
-  if (argc == 2 && (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0))
-  {
-    fprintf(stderr, "Usage: no argument - simple test\n  highresttest intv shift - with statistics\n  intv: interval, shift: delay for more precision\n\n");
-    return 0;
+  if (argc == 2 && (strcmp(argv[1],"-h") == 0 || strcmp(argv[1],"--help") == 0)) {
+     fprintf(stderr, "Usage: no argument - simple test\n  highresttest intv shift - with statistics\n  intv: interval, shift: delay for more precision\n\n");
+     return 0;
   }
 
   printf("----- Testing highres timer:\n");
@@ -136,90 +123,149 @@ int main(int argc, char *argv[])
   tsc_freq_hz = get_tsc_freq();
   printf("TSC Frequency: %lld Hz\n", tsc_freq_hz);
 
+  ret = clock_getres(CLOCK_REALTIME, &res);
+  printf("realtime resolution: %ld s %ld ns (%d)\n", res.tv_sec, res.tv_nsec, ret); 
+
+  ret = clock_gettime(CLOCK_REALTIME, &tim);
+  printf("realtime: %ld s %ld ns (%d)\n", tim.tv_sec, tim.tv_nsec, ret); 
+
   ret = clock_getres(CLOCK_MONOTONIC, &res);
   highresok = (res.tv_sec == 0 && res.tv_nsec == 1);
-  printf("monotonic resolution: %ld s %ld ns (%d)\n", res.tv_sec, res.tv_nsec, ret);
+  printf("monotonic resolution: %ld s %ld ns (%d)\n", res.tv_sec, res.tv_nsec, ret); 
 
   ret = clock_gettime(CLOCK_MONOTONIC, &tim);
+  printf("monotonic: %ld s %ld ns (%d)\n", tim.tv_sec, tim.tv_nsec, ret); 
 
-  printf("monotonic: %ld s %ld ns (%d)\n", tim.tv_sec, tim.tv_nsec, ret);
-  
-  if (highresok && argc > 1)
-  {
+  ret = clock_getres(CLOCK_PROCESS_CPUTIME_ID, &res);
+  printf("process resolution: %ld s %ld ns (%d)\n", res.tv_sec, res.tv_nsec, ret); 
 
-    printf("Measuring actual precision of rdtsc() for 10 seconds ...\n");
+  ret = clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &tim);
+  printf("process: %ld s %ld ns (%d)\n", tim.tv_sec, tim.tv_nsec, ret); 
+
+  if (highresok && argc > 1) {
+    
+    printf("Measuring actual precision of monotonic clock for 10 seconds ...\n");
     step = 1000000;
     nloops = 10000;
-    shift = 10000;
-    if (argc > 2)
-      shift = atoi(argv[2]);
-    if (shift <= 0)
-      shift = 10000;
     dint = atoi(argv[1]);
     if (dint <= 0)
       dint = 500;
     min = 0;
     max = 0;
-    dev = 0;
-    // calculate ticks per step
-    step_ticks = ns_to_ticks(step);
-    for (i = 0; i < 21; count[i] = 0, i++)
-      ;
-    start_ticks = read_tsc();
-    last_ticks = start_ticks;
-
+    dev =0;
+    clock_gettime(MYCLOCK, &res);
+    last = res;
+    
+    for(i=0; i<21; count[i]=0, i++);
     /* avoid some startup jitter */
-    for (first = 100, i = 0; i < nloops + 99; i++)
+    for(first=100, i=0; i < nloops+99; i++) 
     {
-      start_ticks += step_ticks;
-      sleep_ns(step-shift);
-      do
-      {
-        end_ticks = __rdtsc();
-      } while (start_ticks > end_ticks);
-
-      d = (ticks_to_ns(end_ticks - last_ticks) - step);
-
-      last_ticks = end_ticks;
-
-      // printf("%ld\n", d);
-      if (first == 0)
-      {
-        k = d / dint;
-        if (k < -10)
-          k = -10;
-        if (k > 10)
-          k = 10;
-        count[k + 10]++;
-        if (d < min)
-          min = d;
-        if (d > max)
-          max = d;
-        dev += d;
+      res.tv_nsec = res.tv_nsec+step;
+      if (res.tv_nsec > 999999999) {
+        res.tv_sec++;
+        res.tv_nsec -= 1000000000;
       }
-      else if (first == 1)
-      {
+      while (clock_nanosleep(MYCLOCK, TIMER_ABSTIME, &res, NULL) != 0);
+      clock_gettime(MYCLOCK, &tim);
+      d = difftimens(last, tim)-step;
+      k = d/dint;
+      if (k < -10) k = -10;
+      if (k > 10) k = 10;
+      count[k+10]++;
+      last = tim;
+
+      //printf("%ld\n", d);
+      if (first == 0) {
+        if (d < min)
+           min = d;
+        if (d > max)
+           max = d;
+        dev += d;
+      } else if (first == 1) {
         min = d;
         max = d;
         first = 0;
-      }
-      else
+      } else 
         first--;
     }
     printf("    Min diff: %ld ns, max diff: %ld ns, \n"
            "    avg. diff: %ld ns\n",
-           min, max, dev / nloops);
+           min, max, dev/nloops);
     printf("   diff in ns      count\n");
     printf(" < -10*%ld        %ld\n", dint, count[0]);
-    for (i = -9; i < 10; i++)
-      printf("    %d*%ld        %ld\n", i, dint, count[i + 10]);
+    for(i=-9; i<10; i++)
+        printf("    %d*%ld        %ld\n", i, dint, count[i+10]);
     printf(" >  10*%ld        %ld\n", dint, count[20]);
+
+    printf("--------------------------------------\n");
+    printf("Measuring actual precision with tsc correction loops for 10 seconds ...\n");
+
+
+    step = 1000000;
+    nloops = 10000;
+    shift = 100000;
+    if (argc > 2) 
+      shift = atoi(argv[2]);
+    if (shift <= 0)
+      shift = 100000;
+    min = 0;
+    max = 0;
+    dev =0;
+    for(i=0; i<21; count[i]=0, i++);
+
+    clock_gettime(MYCLOCK, &res);
+    last = res;
+    
+    /* avoid some startup jitter */
+    for(first=100, i=0; i < nloops+99; i++) 
+    {
+      res.tv_nsec = res.tv_nsec+step;
+      if (res.tv_nsec > 999999999) {
+        res.tv_sec++;
+        res.tv_nsec -= 1000000000;
+      }
+      while (clock_nanosleep(MYCLOCK, TIMER_ABSTIME, &res, NULL) != 0);
+      clock_gettime(CLOCK_MONOTONIC, &ttime);
+      nsloop(shift - difftimens(res, ttime));
+      clock_gettime(MYCLOCK, &tim);
+      d = difftimens(last, tim)-step;
+
+      last = tim;
+
+      //printf("%ld\n", d);
+      if (first == 0) {
+        k = d/dint;
+        if (k < -10) k = -10;
+        if (k > 10) k = 10;
+        count[k+10]++;
+        if (d < min)
+           min = d;
+        if (d > max)
+           max = d;
+        dev += d;
+      } else if (first == 1) {
+        min = d;
+        max = d;
+        first = 0;
+      } else 
+        first--;
+    }
+    printf("    Min diff: %ld ns, max diff: %ld ns, \n"
+           "    avg. diff: %ld ns\n",
+           min, max, dev/nloops);
+    printf("   diff in ns      count\n");
+    printf(" < -10*%ld        %ld\n", dint, count[0]);
+    for(i=-9; i<10; i++)
+        printf("    %d*%ld        %ld\n", i, dint, count[i+10]);
+    printf(" >  10*%ld        %ld\n", dint, count[20]);
+
   }
 
-  if (highresok)
-    printf("\nHighres timer seems enabled!\n");
+  if (highresok) 
+     printf("\nHighres timer seems enabled!\n");
   else
-    printf("\nHighres is NOT enabled!\n");
+     printf("\nHighres is NOT enabled!\n");
 
   return 0;
+
 }

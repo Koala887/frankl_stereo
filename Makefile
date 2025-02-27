@@ -16,9 +16,9 @@ CFLAGSNO=-O0 -Wall -z execstack -D_FILE_OFFSET_BITS=64 -fgnu89-inline -mwaitpkg 
 #ALL: bin tmp bin/volrace bin/bufhrt bin/bufhrtmin bin/highrestest \
 #     bin/writeloop bin/catloop bin/playhrt bin/playhrtmin bin/playhrtbuschel bin/cptoshm bin/shmcat \
 #     bin/resample_soxr bin/cat64 bin/shownfinfo bin/music2nf
-ALL: bin tmp bin/bufhrt bin/bufhrtmin bin/bufhrtmin-tsc bin/highrestest bin/highrestest-tsc \
-     bin/writeloop bin/catloop bin/playhrt bin/playhrtmin bin/playhrtmin-tsc bin/playhrtmin-shift \
-	 bin/highrestest-shift bin/bufhrtmin-shift
+ALL: bin tmp bin/bufhrt bin/bufhrtmin bin/bufhrtmin-tsc bin/bufhrtmin-shift \
+     bin/highrestest bin/highrestest-tsc bin/highrestest-shift \
+     bin/playhrt bin/playhrtmin bin/playhrtmin-tsc bin/playhrtmin-shift
 
 bin:
 	mkdir -p bin
