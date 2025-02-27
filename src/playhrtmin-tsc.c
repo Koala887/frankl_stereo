@@ -571,7 +571,7 @@ int main(int argc, char *argv[])
           /* short active pause before before cprefresh
             (too short for sleeps) */
           copy_ticks += csec_ticks;
-          _tpause(1, copy_ticks);
+          tpause(copy_ticks);
           memclean((char*)(tbufs[k]), ilen);
           cprefresh((char*)(tbufs[k]), (char*)(tbufs[k-1]), ilen);
           memclean((char*)(tbufs[k-1]), ilen);
@@ -593,8 +593,8 @@ int main(int argc, char *argv[])
       while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &mtime, NULL) != 0);
 
       
-      _tpause(1, start_ticks - 100000ull);
-      _tpause(1, start_ticks - shift);
+      tpause(start_ticks - 100000ull);
+      tpause(start_ticks - shift);
       while (start_ticks > __rdtsc());
       snd_pcm_mmap_commit(pcm_handle, offset, frames);
       clock_gettime(CLOCK_MONOTONIC, &mtime);
