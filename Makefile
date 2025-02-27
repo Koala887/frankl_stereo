@@ -10,7 +10,10 @@ ARCH=$(shell uname -m)
 CFLAGS=-O2 -Wall -z execstack -D_FILE_OFFSET_BITS=64 -fgnu89-inline -DREFRESH$(REFRESH)
 
 # CFLAGS without optimization
-CFLAGSNO=-O0 -Wall -z execstack -D_FILE_OFFSET_BITS=64 -fgnu89-inline -mwaitpkg -DREFRESH$(REFRESH)
+CFLAGSNO=-O0 -Wall -z execstack -D_FILE_OFFSET_BITS=64 -fgnu89-inline -DREFRESH$(REFRESH)
+
+# CFLAGS without optimization
+CFLAGSNOWAIT=-O0 -Wall -z execstack -D_FILE_OFFSET_BITS=64 -fgnu89-inline -mwaitpkg -DREFRESH$(REFRESH)
 
 # targets
 #ALL: bin tmp bin/volrace bin/bufhrt bin/bufhrtmin bin/highrestest \
@@ -67,7 +70,7 @@ bin/highrestest: src/highrestest.c |bin
 	$(CC) $(CFLAGSNO) -o bin/highrestest src/highrestest.c -lrt
 
 bin/highrestest-tsc: src/highrestest-tsc.c |bin
-	$(CC) $(CFLAGSNO) -o bin/highrestest-tsc src/highrestest-tsc.c -lrt
+	$(CC) $(CFLAGSNOWAIT) -o bin/highrestest-tsc src/highrestest-tsc.c -lrt
 
 bin/highrestest-shift: src/highrestest-shift.c |bin
 	$(CC) $(CFLAGSNO) -o bin/highrestest-shift src/highrestest-shift.c -lrt
@@ -120,7 +123,7 @@ bin/playhrtmin: src/version.h tmp/net.o src/playhrtmin.c tmp/cprefresh.o tmp/cpr
 	$(CC) $(CFLAGSNO) -o bin/playhrtmin src/playhrtmin.c tmp/net.o tmp/cprefresh.o tmp/cprefresh_ass.o -lasound -lrt
 
 bin/playhrtmin-tsc: src/version.h tmp/net.o src/playhrtmin-tsc.c tmp/cprefresh.o tmp/cprefresh_ass.o |bin
-	$(CC) $(CFLAGSNO) -o bin/playhrtmin-tsc src/playhrtmin-tsc.c tmp/net.o tmp/cprefresh.o tmp/cprefresh_ass.o -lasound -lrt
+	$(CC) $(CFLAGSNOWAIT) -o bin/playhrtmin-tsc src/playhrtmin-tsc.c tmp/net.o tmp/cprefresh.o tmp/cprefresh_ass.o -lasound -lrt
 
 bin/playhrtmin-shift: src/version.h tmp/net.o src/playhrtmin-shift.c tmp/cprefresh.o tmp/cprefresh_ass.o |bin
 	$(CC) $(CFLAGSNO) -o bin/playhrtmin-shift src/playhrtmin-shift.c tmp/net.o tmp/cprefresh.o tmp/cprefresh_ass.o -lasound -lrt
@@ -132,7 +135,7 @@ bin/bufhrtmin: src/version.h tmp/net.o src/bufhrtmin.c tmp/cprefresh.o tmp/cpref
 	$(CC) $(CFLAGSNO) -o bin/bufhrtmin src/bufhrtmin.c tmp/net.o tmp/cprefresh.o tmp/cprefresh_ass.o -lpthread -lrt
 
 bin/bufhrtmin-tsc: src/version.h tmp/net.o src/bufhrtmin-tsc.c tmp/cprefresh.o tmp/cprefresh_ass.o |bin
-	$(CC) $(CFLAGSNO) -o bin/bufhrtmin-tsc src/bufhrtmin-tsc.c tmp/net.o tmp/cprefresh.o tmp/cprefresh_ass.o -lpthread -lrt
+	$(CC) $(CFLAGSNOWAIT) -o bin/bufhrtmin-tsc src/bufhrtmin-tsc.c tmp/net.o tmp/cprefresh.o tmp/cprefresh_ass.o -lpthread -lrt
 
 bin/bufhrtmin-shift: src/version.h tmp/net.o src/bufhrtmin-shift.c tmp/cprefresh.o tmp/cprefresh_ass.o |bin
 	$(CC) $(CFLAGSNO) -o bin/bufhrtmin-shift src/bufhrtmin-shift.c tmp/net.o tmp/cprefresh.o tmp/cprefresh_ass.o -lpthread -lrt
