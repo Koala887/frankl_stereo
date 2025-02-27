@@ -136,7 +136,7 @@ int main(int argc, char *argv[])
                                            outnetbufsize;
   long blen, hlen, ilen, olen, outpersec, loopspersec, nsec, count, wnext, shift;
   long long icount, ocount;
-  long long start_ticks, last_ticks, nsec_ticks;
+  long long start_ticks, nsec_ticks;
   void *buf, *iptr, *optr, *max;
   char *port, *inhost, *inport, *outfile, *infile;
   double looperr, extraerr, extrabps, off;

@@ -124,7 +124,7 @@ int main(int argc, char *argv[])
       nsec, csec, shift;
   long long count;
     void *buf, *iptr, *tbuf, *tbufs[1024];
-    struct timespec mtime, ctime, ttime;
+    struct timespec mtime, ttime;
   double looperr, extraerr, extrabps;
   snd_pcm_t *pcm_handle;
   snd_pcm_hw_params_t *hwparams;

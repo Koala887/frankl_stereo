@@ -127,7 +127,7 @@ int main(int argc, char *argv[])
 {
   int ret, highresok, first, nloops, i, k, shift;
   long step, d, min, max, dev, dint, count[21];
-  struct timespec res, tim, mtime;
+  struct timespec res, tim;
   long long start_ticks, end_ticks, last_ticks, step_ticks;
 
   if (argc == 2 && (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0))
