@@ -23,9 +23,7 @@ http://www.gnu.org/licenses/gpl.txt for license details.
 #include "cprefresh.h"
 #include <linux/prctl.h>
 #include <sys/prctl.h>
-#include <emmintrin.h>
 #include <x86intrin.h>
-#include <x86gprintrin.h>
 #include <linux/perf_event.h>
 #include <asm/unistd.h>
 #include <inttypes.h>
@@ -111,6 +109,7 @@ long ns_to_ticks(long ns)
 
 static inline long nsloop(long cnt)
 {
+  if (cnt < 0) return 0;
   unsigned long long tsc = read_tsc();
   unsigned long long end = tsc + ns_to_ticks(cnt);
   while (end > __rdtsc());

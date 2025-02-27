@@ -16,9 +16,7 @@ http://www.gnu.org/licenses/gpl.txt for license details.
 #include <string.h>
 #include <linux/prctl.h>
 #include <sys/prctl.h>
-#include <emmintrin.h>
 #include <x86intrin.h>
-#include <x86gprintrin.h>
 
 //#define MYCLOCK CLOCK_MONOTONIC_RAW
 #define MYCLOCK CLOCK_MONOTONIC
@@ -97,6 +95,7 @@ long difftimens(struct timespec t1, struct timespec t2)
 
 static inline long nsloop(long cnt)
 {
+  if (cnt < 0) return 0;
   unsigned long long tsc = read_tsc();
   unsigned long long end = tsc + ns_to_ticks(cnt);
   while (end > __rdtsc());
@@ -225,7 +224,7 @@ int main(int argc, char *argv[]) {
         res.tv_nsec -= 1000000000;
       }
       while (clock_nanosleep(MYCLOCK, TIMER_ABSTIME, &res, NULL) != 0);
-      clock_gettime(CLOCK_MONOTONIC, &ttime);
+      clock_gettime(MYCLOCK, &ttime);
       nsloop(shift - difftimens(res, ttime));
       clock_gettime(MYCLOCK, &tim);
       d = difftimens(last, tim)-step;
