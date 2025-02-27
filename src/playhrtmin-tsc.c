@@ -133,7 +133,7 @@ int main(int argc, char *argv[])
       nsec, csec, shift;
 
   unsigned long long count, start_ticks, nsec_ticks, copy_ticks, csec_ticks, sleep_ticks;
-  void *buf, *iptr, *tbuf, *tbufs[102];
+  void *buf, *iptr, *tbuf, *tbufs[1024];
   double looperr, extraerr, extrabps;
   snd_pcm_t *pcm_handle;
   snd_pcm_hw_params_t *hwparams;
@@ -373,7 +373,7 @@ int main(int argc, char *argv[])
   }
 
   /* temporary buffers */
-  for (i=1; i < nrcp; i++) {
+  for (i=0; i <= nrcp; i++) {
       if (posix_memalign(tbufs+i, 4096, 2*olen*bytesperframe)) {
           fprintf(stderr, "myplayhrt: Cannot allocate buffer for cleaning.\n");
           exit(2);
@@ -593,7 +593,7 @@ int main(int argc, char *argv[])
       while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &mtime, NULL) != 0);
 
       
-      tpause(start_ticks - 100000ull);
+      //tpause(start_ticks - 100000ull);
       tpause(start_ticks - shift);
       while (start_ticks > __rdtsc());
       snd_pcm_mmap_commit(pcm_handle, offset, frames);

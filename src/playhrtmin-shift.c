@@ -359,7 +359,7 @@ int main(int argc, char *argv[])
       ilen = bytesperframe * (olen + 1);
   }
   /* temporary buffer */
-    for (i=1; i < nrcp; i++) {
+    for (i=0; i <= nrcp; i++) {
         if (posix_memalign(tbufs+i, 4096, 2*olen*bytesperframe)) {
             fprintf(stderr, "myplayhrt: Cannot allocate buffer for cleaning.\n");
             exit(2);
