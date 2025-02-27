@@ -120,9 +120,9 @@ static inline long nsloop(long cnt)
 int main(int argc, char *argv[])
 {
   int sfd, s, verbose, nrchannels, startcount,
-        stripped, innetbufsize, nrcp, slowcp, k;
+        stripped, innetbufsize, nrcp, slowcp, k, i;
   long blen, ilen, olen, extra, loopspersec, sleep,
-      nsec, csec;
+      nsec, csec, shift;
   long long count;
     void *buf, *iptr, *tbuf, *tbufs[1024];
     struct timespec mtime, ctime, ttime;
