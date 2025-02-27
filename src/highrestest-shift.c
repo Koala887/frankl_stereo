@@ -97,8 +97,8 @@ long difftimens(struct timespec t1, struct timespec t2)
 
 static inline long nsloop(long cnt)
 {
-  long long tsc = read_tsc();
-  long long end = tsc + ns_to_ticks(cnt);
+  unsigned long long tsc = read_tsc();
+  unsigned long long end = tsc + ns_to_ticks(cnt);
   while (end > __rdtsc());
   return 0;
 }

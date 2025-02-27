@@ -51,14 +51,6 @@ inline long difftimens(struct timespec t1, struct timespec t2)
   return (long)(l2 - l1);
 }
 
-static inline long nsloop(long cnt)
-{
-  long long tsc = read_tsc();
-  long long end = tsc + ns_to_ticks(cnt);
-  while (end > __rdtsc());
-  return 0;
-}
-
 long long tsc_freq_hz;
 
 static long perf_event_open(struct perf_event_attr *hw_event, pid_t pid,
@@ -120,6 +112,14 @@ long ns_to_ticks(long ns)
   x *= tsc_freq_hz;
   x /= 1000000000ull;
   return (x);
+}
+
+static inline long nsloop(long cnt)
+{
+  unsigned long long tsc = read_tsc();
+  unsigned long long end = tsc + ns_to_ticks(cnt);
+  while (end > __rdtsc());
+  return 0;
 }
 
 int main(int argc, char *argv[])
