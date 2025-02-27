@@ -474,8 +474,8 @@ int main(int argc, char *argv[])
     }
     refreshmem((char *)optr, wnext);      
     while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &mtime, NULL) != 0);
-    _tpause(start_ticks - 100000);
-    _tpause(start_ticks - shift);
+    _tpause(1, start_ticks - 100000);
+    _tpause(1, start_ticks - shift);
     while (start_ticks > __rdtsc());
 
     /* write a chunk, this comes first after waking from sleep */
