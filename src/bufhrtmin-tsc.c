@@ -94,11 +94,11 @@ static inline unsigned long long read_tsc(void)
   return (tsc);
 }
 
-static inline int tpause(long long end)
+static inline int tpause(unsigned long long end)
 {
   int i, loops;
   long sleep;
-  long long tsc = read_tsc();
+  unsigned long long tsc = read_tsc();
   if (tsc > end) return (0);
   long step = (end - tsc);
   /* maximum sleep time for tpause is 100000 */
@@ -136,7 +136,7 @@ int main(int argc, char *argv[])
                                            outnetbufsize;
   long blen, hlen, ilen, olen, outpersec, loopspersec, nsec, count, wnext, shift;
   long long icount, ocount;
-  long long start_ticks, nsec_ticks;
+  unsigned long long start_ticks, nsec_ticks;
   void *buf, *iptr, *optr, *max;
   char *port, *inhost, *inport, *outfile, *infile;
   double looperr, extraerr, extrabps, off;
@@ -467,14 +467,14 @@ int main(int argc, char *argv[])
   {
     start_ticks += nsec_ticks;
       
-    mtime.tv_nsec += (nsec-150000);
+    mtime.tv_nsec += (nsec-150000ul);
     if (mtime.tv_nsec > 999999999) {
       mtime.tv_sec++;
       mtime.tv_nsec -= 1000000000;
     }
     refreshmem((char *)optr, wnext);      
     while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &mtime, NULL) != 0);
-    _tpause(1, start_ticks - 100000);
+    _tpause(1, start_ticks - 100000ull);
     _tpause(1, start_ticks - shift);
     while (start_ticks > __rdtsc());
 

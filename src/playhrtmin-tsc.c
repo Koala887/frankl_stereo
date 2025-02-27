@@ -91,11 +91,11 @@ static inline unsigned long long read_tsc(void)
   return (tsc);
 }
 
-static inline int tpause(long long end)
+static inline int tpause(unsigned long long end)
 {
   int i, loops;
   long sleep;
-  long long tsc = read_tsc();
+  unsigned long long tsc = read_tsc();
   if (tsc > end) return (0);
   long step = (end - tsc);
   /* maximum sleep time for tpause is 100000 */
@@ -132,7 +132,7 @@ int main(int argc, char *argv[])
   long blen, ilen, olen, extra, loopspersec, sleep,
       nsec, csec, shift;
 
-  long long count, start_ticks, nsec_ticks, copy_ticks, csec_ticks, sleep_ticks;
+  unsigned long long count, start_ticks, nsec_ticks, copy_ticks, csec_ticks, sleep_ticks;
   void *buf, *iptr, *tbuf, *tbufs[102];
   double looperr, extraerr, extrabps;
   snd_pcm_t *pcm_handle;
@@ -585,7 +585,7 @@ int main(int argc, char *argv[])
         }
       }
 	  start_ticks += nsec_ticks;
-      mtime.tv_nsec += (nsec-150000);
+      mtime.tv_nsec += (nsec-150000ul);
       if (mtime.tv_nsec > 999999999) {
         mtime.tv_sec++;
         mtime.tv_nsec -= 1000000000;
@@ -593,7 +593,7 @@ int main(int argc, char *argv[])
       while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &mtime, NULL) != 0);
 
       
-      _tpause(1, start_ticks - 100000);
+      _tpause(1, start_ticks - 100000ull);
       _tpause(1, start_ticks - shift);
       while (start_ticks > __rdtsc());
       snd_pcm_mmap_commit(pcm_handle, offset, frames);
