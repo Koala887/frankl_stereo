@@ -35,18 +35,36 @@ http://www.gnu.org/licenses/gpl.txt for license details.
 
 #define TBUF 134217728 /* 2^27 */
 
-long long tsc_freq_hz;
-static long perf_event_open(struct perf_event_attr *hw_event, pid_t pid,
-                            int cpu, int group_fd, unsigned long flags)
-{
-  return syscall(__NR_perf_event_open, hw_event, pid, cpu, group_fd, flags);
-}
-
 void usage()
 {
   fprintf(stderr,
           "bufhrt (version %s of frankl's stereo utilities)\nUSAGE:\n",
           VERSION);
+}
+
+/* difference t2 - t1 in ns */
+inline long difftimens(struct timespec t1, struct timespec t2)
+{
+  long long l1, l2;
+  l1 = t1.tv_sec * 1000000000 + t1.tv_nsec;
+  l2 = t2.tv_sec * 1000000000 + t2.tv_nsec;
+  return (long)(l2 - l1);
+}
+
+static inline long nsloop(long cnt)
+{
+  long long tsc = read_tsc();
+  long long end = tsc + ns_to_ticks(cnt);
+  while (end > __rdtsc());
+  return 0;
+}
+
+long long tsc_freq_hz;
+
+static long perf_event_open(struct perf_event_attr *hw_event, pid_t pid,
+                            int cpu, int group_fd, unsigned long flags)
+{
+  return syscall(__NR_perf_event_open, hw_event, pid, cpu, group_fd, flags);
 }
 
 long long get_tsc_freq(void)
@@ -76,6 +94,8 @@ long long get_tsc_freq(void)
     fprintf(stderr, "Perf system doesn't support user time\n");
     return 1;
   }
+  //printf("TSC-Mult: %u \n", pc->time_mult);
+  //printf("TSC-Shift: %u \n", pc->time_shift);
   close(fd);
 
   __uint128_t x = 1000000000ull;
@@ -94,27 +114,6 @@ static inline unsigned long long read_tsc(void)
   return (tsc);
 }
 
-static inline int sleep_ns(int step)
-{
-  struct timespec mtime;
-  clock_gettime(CLOCK_MONOTONIC, &mtime);
-  mtime.tv_nsec += (step);
-  if (mtime.tv_nsec > 999999999) {
-    mtime.tv_sec++;
-    mtime.tv_nsec -= 1000000000;
-  }      
-  while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &mtime, NULL) != 0);
-  return (0);
-}
-
-long long ticks_to_ns(long long ticks)
-{
-  __uint128_t x = ticks;
-  x *= 1000000000ull;
-  x /= tsc_freq_hz;
-  return (x);
-}
-
 long ns_to_ticks(long ns)
 {
   __uint128_t x = ns;
@@ -129,15 +128,17 @@ int main(int argc, char *argv[])
   int listenfd, connfd, ifd, s, moreinput, optval = 1, rate,
                                            bytesperframe, optc, interval, innetbufsize, nrcp,
                                            outnetbufsize;
-  long blen, hlen, ilen, olen, outpersec, loopspersec, nsec, count, wnext, shift;
+  long blen, hlen, ilen, olen, outpersec, loopspersec, nsec, count, wnext,
+      outcopies, rambps, ramlps, shift,
+      ramchunk;
   long long icount, ocount;
-  long long start_ticks, last_ticks, nsec_ticks;
   void *buf, *iptr, *optr, *max;
   char *port, *inhost, *inport, *outfile, *infile;
-  struct timespec mtime;
+  void *obufs[1024];
+  struct timespec mtime, ttime;
   double looperr, extraerr, extrabps, off;
 
-  /* variables for shared memory input */
+  int i;
 
   /* read command line options */
   static struct option longoptions[] = {
@@ -180,6 +181,7 @@ int main(int argc, char *argv[])
   }
   /* defaults */
   port = NULL;
+
   outfile = NULL;
   blen = 65536;
   /* default input is stdin */
@@ -189,6 +191,11 @@ int main(int argc, char *argv[])
   ilen = 0;
   loopspersec = 1000;
   outpersec = 0;
+  ramlps = 0;
+  rambps = 0;
+  ramchunk = 0;
+  outcopies = 0;
+
   rate = 0;
   bytesperframe = 0;
   inhost = NULL;
@@ -199,7 +206,8 @@ int main(int argc, char *argv[])
   nrcp = 0;
   innetbufsize = 0;
   outnetbufsize = 0;
-  shift = 100000;
+  shift = 95000; 
+
   while ((optc = getopt_long(argc, argv, "p:o:b:i:D:n:m:X:Y:s:f:F:R:c:H:P:e:x:vVIhd",
                              longoptions, &optind)) != -1)
   {
@@ -226,8 +234,10 @@ int main(int argc, char *argv[])
       outpersec = atoi(optarg);
       break;
     case 'X':
+      ramlps = atoi(optarg);
       break;
     case 'Y':
+      rambps = atoi(optarg);
       break;
     case 's':
       rate = atoi(optarg);
@@ -238,6 +248,9 @@ int main(int argc, char *argv[])
         nrcp = 0;
       break;
     case 'c':
+      outcopies = atoi(optarg);
+      if (outcopies < 0 || outcopies > 1000)
+        outcopies = 0;
       break;
     case 'f':
       if (strcmp(optarg, "S16_LE") == 0)
@@ -291,7 +304,7 @@ int main(int argc, char *argv[])
         outnetbufsize = 128;
       break;
     case 'x':
-      shift = atoi(optarg);
+      shift = atoi(optarg); 
       break;
     case 'O':
       break; /* ignored */
@@ -310,13 +323,6 @@ int main(int argc, char *argv[])
       exit(3);
     }
   }
-
-  /* avoid waiting 50000 ns collecting more sleep requests */
-  prctl(PR_SET_TIMERSLACK, 1L);
-
-  /* get tsc frequency */
-  tsc_freq_hz = get_tsc_freq();
-
   /* check some arguments, open files and set some parameters */
   if (outfile)
   {
@@ -354,11 +360,24 @@ int main(int argc, char *argv[])
       exit(23);
     }
   }
+  if (ramlps != 0 && rambps != 0)
+  {
+
+    ramchunk = rambps / ramlps;
+    while (ramchunk % 16 != 0)
+      ramchunk++;
+    if (ramchunk > TBUF)
+      ramchunk = TBUF;
+  }
+
+  /* avoid waiting 50000 ns collecting more sleep requests */
+  prctl(PR_SET_TIMERSLACK, 1L);
+
+  /* get tsc frequency */
+  tsc_freq_hz = get_tsc_freq();
 
   extraerr = 1.0 * outpersec / (outpersec + extrabps);
   nsec = (int)(1000000000 * extraerr / loopspersec);
-  // calculate ticks per step
-  nsec_ticks = ns_to_ticks(nsec);
   olen = outpersec / loopspersec;
   if (olen <= 0)
     olen = 1;
@@ -397,6 +416,20 @@ int main(int argc, char *argv[])
   max = buf + blen;
   iptr = buf;
   optr = buf;
+
+  /* buffers for loop of output copies */
+  if (outcopies > 0)
+  {
+    /* spend half of loop duration with copies of output chunk */
+
+    for (i = 1; i < outcopies; i++)
+    {
+      if (posix_memalign(obufs + i, 4096, 2 * olen))
+      {
+        exit(20);
+      }
+    }
+  }
 
   /* outgoing socket */
   if (port != 0)
@@ -455,23 +488,36 @@ int main(int argc, char *argv[])
   else
     wnext = olen;
 
-  start_ticks = read_tsc();
+  if (clock_gettime(CLOCK_MONOTONIC, &mtime) < 0)
+  {
+    exit(14);
+  }
+
   /* main loop */
 
   for (count = 1, off = looperr; 1; count++, off += looperr)
   {
-    last_ticks = start_ticks;
-    start_ticks += nsec_ticks;
-
-    sleep_ns(nsec-shift);  
+    /* once cache is filled and other side is reading we reset time */
+    if (count == 500)
+      clock_gettime(CLOCK_MONOTONIC, &mtime);
+    mtime.tv_nsec += nsec;
+    if (mtime.tv_nsec > 999999999)
+    {
+      mtime.tv_nsec -= 1000000000;
+      mtime.tv_sec++;
+    }
     refreshmem((char *)optr, wnext);
-    while (start_ticks > __rdtsc());
+    while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &mtime, NULL) != 0)
+      ;
+    clock_gettime(CLOCK_MONOTONIC, &ttime);
+    nsloop(shift-difftimens(mtime, ttime));      
     /* write a chunk, this comes first after waking from sleep */
     s = write(connfd, optr, wnext);
     if (s < 0)
     {
       exit(15);
     }
+
     ocount += s;
     optr += s;
     wnext = olen + wnext - s;
