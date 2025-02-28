@@ -6,6 +6,7 @@ See the file License.txt of the distribution and
 http://www.gnu.org/licenses/gpl.txt for license details.
 */
 
+#define _GNU_SOURCE
 #include "version.h"
 #include "net.h"
 #include <sys/types.h>
@@ -375,13 +376,13 @@ static inline long nsloop(long cnt)
 
 int main(int argc, char *argv[])
 {
-    int sfd, s, moreinput, err, verbose, nrchannels, startcount, sumavg,
+    int sfd, s, i, moreinput, err, verbose, nrchannels, startcount, sumavg,
         stripped, innetbufsize, dobufstats, countdelay, maxbad, nrcp, slowcp, k;
     long blen, hlen, ilen, olen, extra, loopspersec, nrdelays, sleep, shift,
          nsec, csec, count, wnext, badloops, badreads, readmissing, avgav, checkav;
     long long icount, ocount, badframes;
-    void *buf, *iptr, *optr, *tbuf, *max;
-    struct timespec mtime, ttime, ctime;
+    void *buf, *iptr, *optr, *tbuf, *tbufs[1024], *max;
+    struct timespec mtime, ttime;
     struct timespec mtimecheck;
     double looperr, off, extraerr, extrabps, morebps;
     snd_pcm_t *pcm_handle;
