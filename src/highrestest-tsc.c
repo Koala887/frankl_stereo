@@ -19,7 +19,7 @@ http://www.gnu.org/licenses/gpl.txt for license details.
 #include <emmintrin.h>
 #include <x86intrin.h>
 #include <x86gprintrin.h>
-
+#include <fcntl.h>
 long long tsc_freq_hz;
 
 static long perf_event_open(struct perf_event_attr *hw_event, pid_t pid,

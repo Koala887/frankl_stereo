@@ -28,6 +28,8 @@ http://www.gnu.org/licenses/gpl.txt for license details.
 #include <linux/perf_event.h>
 #include <asm/unistd.h>
 #include <inttypes.h>
+#include <fcntl.h>
+
 /* help page */
 /* vim hint to remove resp. add quotes:
       s/^"\(.*\)\\n"$/\1/

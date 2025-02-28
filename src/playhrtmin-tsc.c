@@ -29,7 +29,7 @@ http://www.gnu.org/licenses/gpl.txt for license details.
 #include <linux/perf_event.h>
 #include <asm/unistd.h>
 #include <inttypes.h>
-
+#include <fcntl.h>
 void usage()
 {
   fprintf(stderr,

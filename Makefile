@@ -21,7 +21,8 @@ CFLAGSNOWAIT=-O0 -Wall -z execstack -D_FILE_OFFSET_BITS=64 -fgnu89-inline -mwait
 #     bin/resample_soxr bin/cat64 bin/shownfinfo bin/music2nf
 ALL: bin tmp bin/bufhrt bin/bufhrtmin bin/bufhrtmin-tsc bin/bufhrtmin-shift \
      bin/highrestest bin/highrestest-tsc bin/highrestest-shift \
-     bin/playhrt bin/playhrtmin bin/playhrtmin-tsc bin/playhrtmin-shift
+     bin/playhrt bin/playhrt-tsc bin/playhrt-shift \
+	 bin/playhrtmin bin/playhrtmin-tsc bin/playhrtmin-shift
 
 bin:
 	mkdir -p bin
@@ -56,6 +57,12 @@ tmp/cprefresh.o: src/cprefresh.h src/cprefresh.c |tmp
 
 bin/playhrt: src/version.h tmp/net.o src/playhrt.c tmp/cprefresh.o tmp/cprefresh_ass.o |bin
 	$(CC) $(CFLAGSNO) -o bin/playhrt src/playhrt.c tmp/net.o tmp/cprefresh.o tmp/cprefresh_ass.o -lasound -lrt
+
+bin/playhrt-tsc: src/version.h tmp/net.o src/playhrt-tsc.c tmp/cprefresh.o tmp/cprefresh_ass.o |bin
+	$(CC) $(CFLAGSNOWAIT) -o bin/playhrt-tsc src/playhrt-tsc.c tmp/net.o tmp/cprefresh.o tmp/cprefresh_ass.o -lasound -lrt
+
+bin/playhrt-shift: src/version.h tmp/net.o src/playhrt-shift.c tmp/cprefresh.o tmp/cprefresh_ass.o |bin
+	$(CC) $(CFLAGSNO) -o bin/playhrt-shift src/playhrt-shift.c tmp/net.o tmp/cprefresh.o tmp/cprefresh_ass.o -lasound -lrt
 
 bin/playhrt_ALSANC: src/version.h tmp/net.o src/playhrt.c tmp/cprefresh.o tmp/cprefresh_ass.o |bin
 	$(CC) $(CFLAGSNO) -DALSANC -I$(ALSANC)/include -L$(ALSANC)/lib -o bin/playhrt_ALSANC src/playhrt.c tmp/net.o tmp/cprefresh.o tmp/cprefresh_ass.o -lasound -lrt 
@@ -127,9 +134,6 @@ bin/playhrtmin-tsc: src/version.h tmp/net.o src/playhrtmin-tsc.c tmp/cprefresh.o
 
 bin/playhrtmin-shift: src/version.h tmp/net.o src/playhrtmin-shift.c tmp/cprefresh.o tmp/cprefresh_ass.o |bin
 	$(CC) $(CFLAGSNO) -o bin/playhrtmin-shift src/playhrtmin-shift.c tmp/net.o tmp/cprefresh.o tmp/cprefresh_ass.o -lasound -lrt
-
-bin/playhrtbuschel: src/version.h tmp/net.o src/playhrtbuschel.c tmp/cprefresh.o tmp/cprefresh_ass.o |bin
-	$(CC) $(CFLAGSNO) -o bin/playhrtbuschel src/playhrtbuschel.c tmp/net.o tmp/cprefresh.o tmp/cprefresh_ass.o -lasound -lrt
 
 bin/bufhrtmin: src/version.h tmp/net.o src/bufhrtmin.c tmp/cprefresh.o tmp/cprefresh_ass.o |bin
 	$(CC) $(CFLAGSNO) -o bin/bufhrtmin src/bufhrtmin.c tmp/net.o tmp/cprefresh.o tmp/cprefresh_ass.o -lpthread -lrt
