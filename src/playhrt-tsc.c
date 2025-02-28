@@ -401,8 +401,8 @@ long ns_to_ticks(long ns)
 }
 static void ns2timespec(struct timespec *ts, unsigned long ns)
 {
-    ts->tv_sec = ms / 1000000000;
-    ts->tv_nsec = (ms % 1000000000);
+    ts->tv_sec = ns / 1000000000;
+    ts->tv_nsec = (ns % 1000000000);
 }
 
 int main(int argc, char *argv[])
