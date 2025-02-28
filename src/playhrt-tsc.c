@@ -399,23 +399,10 @@ long ns_to_ticks(long ns)
   x /= 1000000000ull;
   return (x);
 }
-
-struct timespec ns_to_timespec(const long nsec)
+static void ns2timespec(struct timespec *ts, unsigned long ns)
 {
-	struct timespec ts;
-	long rem;
-
-	if (!nsec)
-		return (struct timespec) {0, 0};
-
-	ts.tv_sec = div_s64_rem(nsec, 1000000000L, &rem);
-	if (unlikely(rem < 0)) {
-		ts.tv_sec--;
-		rem += 1000000000L;
-	}
-	ts.tv_nsec = rem;
-
-	return ts;
+    ts->tv_sec = ms / 1000000000;
+    ts->tv_nsec = (ms % 1000000000);
 }
 
 int main(int argc, char *argv[])
@@ -1212,7 +1199,7 @@ int main(int argc, char *argv[])
     /* get time */
     clock_gettime(CLOCK_MONOTONIC, &ttime);
     start_ticks = read_tsc();
-    mtime = ns_to_timespec(ticks_to_ns(start_ticks));
+    ns2timespec(&mtime, ticks_to_ns(start_ticks));
     if (verbose)
       fprintf(stderr, "playhrt: Start time (%ld sec %ld nsec).\n",
               mtime.tv_sec, mtime.tv_nsec);
@@ -1322,7 +1309,7 @@ int main(int argc, char *argv[])
       /* compute time for next wakeup */
       last_ticks = start_ticks;
       start_ticks += nsec_ticks;
-      mtime = ns_to_timespec(ticks_to_ns(start_ticks));
+      ns2timespec(&mtime, ticks_to_ns(start_ticks));
       /* we refresh the new data before sleeping and commiting */
       refreshmem(iptr, s);
 
