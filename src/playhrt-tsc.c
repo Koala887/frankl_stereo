@@ -407,15 +407,14 @@ static void ns2timespec(struct timespec *ts, unsigned long ns)
 
 int main(int argc, char *argv[])
 {
-  int sfd, ifd, s, moreinput, err, verbose, nrchannels, startcount, sumavg,
+  int sfd, ifd, s, i, moreinput, err, verbose, nrchannels, startcount, sumavg,
       stripped, innetbufsize, dobufstats, countdelay, maxbad, nrcp, slowcp, k;
   long blen, hlen, ilen, olen, extra, loopspersec, nrdelays, sleep,
       nsec, csec, wnext, badloops, badreads, readmissing, avgav, checkav, shift;
-  long long count, icount, ocount, badframes, start_ticks, end_ticks, last_ticks,
+  long long count, icount, ocount, badframes, start_ticks,
       nsec_ticks, timecheck_ticks, copy_ticks, csec_ticks, sleep_ticks;
   void *buf, *iptr, *optr, *tbuf, *max, *tbufs[1024];
   struct timespec mtime, ttime;
-  struct timespec mtimecheck;
   double looperr, off, extraerr, extrabps, morebps;
   snd_pcm_t *pcm_handle;
   snd_pcm_hw_params_t *hwparams;
@@ -1307,7 +1306,6 @@ int main(int argc, char *argv[])
       }
 
       /* compute time for next wakeup */
-      last_ticks = start_ticks;
       start_ticks += nsec_ticks;
       ns2timespec(&mtime, ticks_to_ns(start_ticks));
       /* we refresh the new data before sleeping and commiting */
@@ -1375,7 +1373,7 @@ int main(int argc, char *argv[])
                         "on future calls.\n",
                 (int)(extrabps + morebps));
     }
-    fprintf(stderr, "playhrt: Loops: %ld (%ld delayed), total bytes: %lld in %lld out. \n"
+    fprintf(stderr, "playhrt: Loops: %lld (%ld delayed), total bytes: %lld in %lld out. \n"
                     "playhrt: Bad loops/frames written: %ld/%lld,  bad reads/bytes: %ld/%ld.\n",
             count, nrdelays, icount, ocount, badloops, badframes, badreads, readmissing);
   }
