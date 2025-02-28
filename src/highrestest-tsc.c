@@ -125,7 +125,7 @@ long ns_to_ticks(long ns)
 /* a simple test of the resolution of several CLOCKs */
 int main(int argc, char *argv[])
 {
-  int ret, highresok, first, nloops, i, k, shift;
+  int ifd, ret, highresok, first, nloops, i, k, shift;
   long step, d, min, max, dev, dint, count[21];
   struct timespec res, tim;
   unsigned long long start_ticks, end_ticks, last_ticks, step_ticks;
@@ -140,6 +140,19 @@ int main(int argc, char *argv[])
 
   /* avoid waiting 50000 ns collecting more sleep requests */
   prctl(PR_SET_TIMERSLACK, 1L);
+  
+  /* set max tpause time */
+  ifd = open("/sys/devices/system/cpu/umwait_control/max_time", O_WRONLY);
+  if (ifd != -1)
+  {
+    write(ifd,"1000000", 7);
+    close(ifd);
+  }   
+  else
+  {
+    fprintf(stderr, "Cannot set umwait max_time.\n");
+    exit(2);
+  }
 
   /* get tsc frequency */
   tsc_freq_hz = get_tsc_freq();

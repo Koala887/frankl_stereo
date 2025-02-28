@@ -22,9 +22,7 @@ http://www.gnu.org/licenses/gpl.txt for license details.
 #include "cprefresh.h"
 #include <linux/prctl.h>
 #include <sys/prctl.h>
-#include <emmintrin.h> 
 #include <x86intrin.h>
-#include <x86gprintrin.h>
 #include <linux/perf_event.h>
 #include <asm/unistd.h>
 #include <inttypes.h>
@@ -33,7 +31,6 @@ http://www.gnu.org/licenses/gpl.txt for license details.
       s/^"\(.*\)\\n"$/\1/
       s/.*$/"\0\\n"/
 */
-
 void usage( ) {
   fprintf(stderr,
           "playhrt (version %s of frankl's stereo utilities",
@@ -294,11 +291,21 @@ void usage( ) {
 );
 }
 
+/* difference t2 - t1 in ns */
+inline long difftimens(struct timespec t1, struct timespec t2)
+{ 
+   long long l1, l2;
+   l1 = t1.tv_sec*1000000000 + t1.tv_nsec;
+   l2 = t2.tv_sec*1000000000 + t2.tv_nsec;
+   return (long)(l2-l1);
+}
+
 long long tsc_freq_hz;
+
 static long perf_event_open(struct perf_event_attr *hw_event, pid_t pid,
-           int cpu, int group_fd, unsigned long flags)
+                            int cpu, int group_fd, unsigned long flags)
 {
-    return syscall(__NR_perf_event_open, hw_event, pid, cpu, group_fd, flags);
+  return syscall(__NR_perf_event_open, hw_event, pid, cpu, group_fd, flags);
 }
 
 long long get_tsc_freq(void)
@@ -309,27 +316,29 @@ long long get_tsc_freq(void)
       .config = PERF_COUNT_HW_INSTRUCTIONS,
       .disabled = 1,
       .exclude_kernel = 1,
-      .exclude_hv = 1
-  };
+      .exclude_hv = 1};
   int fd = perf_event_open(&pe, 0, -1, -1, 0);
-  if (fd == -1) {
-      perror("perf_event_open failed");
-      return 1;
+  if (fd == -1)
+  {
+    perror("perf_event_open failed");
+    return 1;
   }
-  void *addr = mmap(NULL, 4*1024, PROT_READ, MAP_SHARED, fd, 0);
-  if (!addr) {
-      perror("mmap failed");
-      return 1;
+  void *addr = mmap(NULL, 4 * 1024, PROT_READ, MAP_SHARED, fd, 0);
+  if (!addr)
+  {
+    perror("mmap failed");
+    return 1;
   }
   struct perf_event_mmap_page *pc = addr;
-  if (pc->cap_user_time != 1) {
-      fprintf(stderr, "Perf system doesn't support user time\n");
-      return 1;
+  if (pc->cap_user_time != 1)
+  {
+    fprintf(stderr, "Perf system doesn't support user time\n");
+    return 1;
   }
-  printf("TSC-Mult: %u \n", pc->time_mult);
-  printf("TSC-Shift: %u \n", pc->time_shift);
+  //printf("TSC-Mult: %u \n", pc->time_mult);
+  //printf("TSC-Shift: %u \n", pc->time_shift);
   close(fd);
-  
+
   __uint128_t x = 1000000000ull;
   x <<= pc->time_shift;
   x /= pc->time_mult;
@@ -338,71 +347,41 @@ long long get_tsc_freq(void)
 }
 
 static inline unsigned long long read_tsc(void)
-{ unsigned long long tsc;
+{
+  unsigned long long tsc;
   _mm_lfence();
   tsc = __rdtsc();
   _mm_lfence();
   return (tsc);
 }
 
-static inline int tpause(unsigned long long end)
-{
-  int i, loops;
-  long sleep;
-  unsigned long long tsc = read_tsc();
-  if (tsc > end) return (0);
-  long step = (end - tsc);
-  /* maximum sleep time for tpause is 100000 */
-  loops = (step / 100000) + 1;
-  sleep = (step / loops);
-  for (i = 1; i < loops; i++)
-  {
-    _tpause(1, (tsc + (i * sleep)));
-  }
-  _tpause(1, end);
-  return (0);
-}
-
-static inline int sleep_ns(int step)
-{
-  struct timespec mtime;
-  clock_gettime(CLOCK_MONOTONIC, &mtime);
-  mtime.tv_nsec += (step);
-  if (mtime.tv_nsec > 999999999) {
-    mtime.tv_sec++;
-    mtime.tv_nsec -= 1000000000;
-  }      
-  while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &mtime, NULL) != 0);
-  return (0);
-}
-
-long long ticks_to_ns(long long ticks)
-{ 
-    __uint128_t x = ticks;
-    x *= 1000000000ull;
-    x /= tsc_freq_hz;
-    return (x);
-}
-
 long ns_to_ticks(long ns)
 {
-    __uint128_t x = ns;
-    x *= tsc_freq_hz;
-    x /= 1000000000ull;
-    return (x);
+  __uint128_t x = ns;
+  x *= tsc_freq_hz;
+  x /= 1000000000ull;
+  return (x);
+}
+
+static inline long nsloop(long cnt)
+{
+  if (cnt < 0) return 0;
+  unsigned long long tsc = read_tsc();
+  unsigned long long end = tsc + ns_to_ticks(cnt);
+  while (end > __rdtsc());
+  return 0;
 }
 
 
 int main(int argc, char *argv[])
 {
-    int sfd, ifd, s, moreinput, err, verbose, nrchannels, startcount, sumavg,
+    int sfd, s, moreinput, err, verbose, nrchannels, startcount, sumavg,
         stripped, innetbufsize, dobufstats, countdelay, maxbad, nrcp, slowcp, k;
-    long blen, hlen, ilen, olen, extra, loopspersec, nrdelays, sleep,
-         nsec, csec, wnext, badloops, badreads, readmissing, avgav, checkav, shift;
-    long long count, icount, ocount, badframes, start_ticks, end_ticks, last_ticks,
-    nsec_ticks, timecheck_ticks, copy_ticks, csec_ticks, sleep_ticks;
-    void *buf, *iptr, *optr, *tbuf, *max, *tbufs[1024];
-    struct timespec mtime, ttime;
+    long blen, hlen, ilen, olen, extra, loopspersec, nrdelays, sleep, shift,
+         nsec, csec, count, wnext, badloops, badreads, readmissing, avgav, checkav;
+    long long icount, ocount, badframes;
+    void *buf, *iptr, *optr, *tbuf, *max;
+    struct timespec mtime, ttime, ctime;
     struct timespec mtimecheck;
     double looperr, off, extraerr, extrabps, morebps;
     snd_pcm_t *pcm_handle;
@@ -434,8 +413,8 @@ int main(int argc, char *argv[])
         {"period-size", required_argument, 0, 'P' },
         {"device", required_argument, 0, 'd' },
         {"extra-bytes-per-second", required_argument, 0, 'e' },
-        {"shift", required_argument, 0, 'x' },
-		{"number-copies", required_argument, 0, 'R' },
+      {"shift", required_argument, 0, 'x'},      
+        {"number-copies", required_argument, 0, 'R' },
         {"slow-copies", no_argument, 0, 'C' },
         {"sleep", required_argument, 0, 'D' },
         {"max-bad-reads", required_argument, 0, 'm' },
@@ -451,6 +430,12 @@ int main(int argc, char *argv[])
         {"help", no_argument, 0, 'h' },
         {0,         0,                 0,  0 }
     };
+
+    /* avoid waiting 50000 ns collecting more sleep requests */
+    prctl(PR_SET_TIMERSLACK, 1L);
+
+  /* get tsc frequency */
+  tsc_freq_hz = get_tsc_freq();
 
     if (argc == 1) {
        usage();
@@ -481,13 +466,13 @@ int main(int argc, char *argv[])
     maxbad = 4;
     nonblock = 0;
     innetbufsize = 0;
-	shift = 100;
     corr = 0;
     verbose = 0;
     stripped = 0;
     dobufstats = 1;
     countdelay = 1;
-    while ((optc = getopt_long(argc, argv, "r:p:Sb:D:i:n:s:f:k:Mc:P:d:R:Ce:x:m:K:o:NXO:vyjVh",
+    shift = 100000;
+    while ((optc = getopt_long(argc, argv, "r:p:Sb:D:i:n:s:f:k:Mc:P:d:R:Ce:m:K:o:NXO:x:vyjVh",
             longoptions, &optind)) != -1) {
         switch (optc) {
         case 'r':
@@ -575,8 +560,8 @@ int main(int argc, char *argv[])
           nonblock = 1;
           break;
         case 'x':
-          shift = atoi(optarg);
-          break;		  
+          shift = atoi(optarg); 
+          break;      
         case 'O':
           break;
         case 'v':
@@ -605,26 +590,6 @@ int main(int argc, char *argv[])
           exit(2);
         }
     }
-
-    /* avoid waiting 50000 ns collecting more sleep requests */
-    prctl(PR_SET_TIMERSLACK, 1L);
-
-    /* get tsc frequency */
-    tsc_freq_hz = get_tsc_freq();
-	
-    /* set max tpause time */
-    ifd = open("/sys/devices/system/cpu/umwait_control/max_time", O_WRONLY);
-    if (ifd != -1)
-    {
-      write(ifd,"1000000", 7);
-      close(ifd);
-    }   
-    else
-    {
-      fprintf(stderr, "Cannot set umwait max_time.\n");
-      exit(2);
-    }
-  
     bytesperframe = bytespersample*nrchannels;
     /* check some arguments and set some parameters */
     if ((host == NULL || port == NULL) && sfd < 0) {
@@ -635,13 +600,7 @@ int main(int argc, char *argv[])
     extraerr = 1.0*bytesperframe*rate;
     extraerr = extraerr/(extraerr+extrabps);
     nsec = (int) (1000000000*extraerr/loopspersec);
-	// calculate ticks per step
-    nsec_ticks= ns_to_ticks(nsec);
-	
-    if (slowcp){
-	    csec = nsec / (8*nrcp);
-        csec_ticks = ns_to_ticks(csec);
-	}
+    if (slowcp) csec = nsec / (8*nrcp);
     if (verbose) {
         fprintf(stderr, "playhrt: Step size is %ld nsec.\n", nsec);
     }
@@ -657,15 +616,14 @@ int main(int argc, char *argv[])
         if (verbose)
             fprintf(stderr, "playhrt: Setting input chunk size to %ld bytes.\n", ilen);
     }
-
-  /* temporary buffers */
-  for (i=1; i < nrcp; i++) {
-      if (posix_memalign(tbufs+i, 4096, 2*olen*bytesperframe)) {
-          fprintf(stderr, "myplayhrt: Cannot allocate buffer for cleaning.\n");
-          exit(2);
-      }
-  }
-  tbuf = tbufs[1];    
+    /* temporary buffer */
+    for (i=0; i <= nrcp; i++) {
+        if (posix_memalign(tbufs+i, 4096, 2*olen*bytesperframe)) {
+            fprintf(stderr, "myplayhrt: Cannot allocate buffer for cleaning.\n");
+            exit(2);
+        }
+    }
+    tbuf = tbufs[1];
 
     /* need big enough input buffer */
     if (blen < 3*ilen) {
@@ -700,10 +658,10 @@ int main(int argc, char *argv[])
     /* the pointers for next input and next output */
     iptr = buf;
     optr = buf;
-
     /**********************************************************************/
     /* setup network connection                                           */
     /**********************************************************************/
+    /* setup network connection */
     if (host != NULL && port != NULL) {
         sfd = fd_net(host, port);
         if (innetbufsize != 0) {
@@ -714,10 +672,9 @@ int main(int argc, char *argv[])
             }
         }
     }
-
-    /**********************************************************************/
-    /* setup sound device                                                 */
-    /**********************************************************************/
+  /**********************************************************************/
+  /* setup sound device                                                 */
+  /**********************************************************************/
     snd_pcm_hw_params_malloc(&hwparams);
     if (snd_pcm_open(&pcm_handle, pcm_name, SND_PCM_STREAM_PLAYBACK, 0) < 0) {
         fprintf(stderr, "playhrt: Error opening PCM device %s\n", pcm_name);
@@ -801,39 +758,53 @@ int main(int argc, char *argv[])
         exit(17);
     }
     snd_pcm_sw_params_free (swparams);
-    /**********************************************************************/
-    /* wait to allow filling input pipeline                               */
-    /**********************************************************************/
 
-    /* get time */
-	start_ticks = read_tsc();
+  /**********************************************************************/
+  /* wait to allow filling input pipeline                               */
+  /**********************************************************************/
 
-    /* use defined sleep (us) to allow input process to fill pipeline */
-    if (sleep > 0) {
-		sleep_ticks = ns_to_ticks(sleep*1000);
-		tpause(start_ticks, sleep_ticks);
+  /* get time */
+  if (clock_gettime(CLOCK_MONOTONIC, &mtime) < 0)
+  {
+    exit(19);
+  }
 
+  /* use defined sleep to allow input process to fill pipeline */
+  if (sleep > 0)
+  {
+    mtime.tv_sec = sleep / 1000000;
+    mtime.tv_nsec = 1000 * (sleep - mtime.tv_sec * 1000000);
+    nanosleep(&mtime, NULL);
     /* waits until pipeline is filled */
-    } else {
-      fd_set rdfs;
-      FD_ZERO(&rdfs);
-      FD_SET(sfd, &rdfs);
+  }
+  else
+  {
+    fd_set rdfs;
+    FD_ZERO(&rdfs);
+    FD_SET(sfd, &rdfs);
 
-      /* select() waits until pipeline is ready */
-      if (select(sfd+1, &rdfs, NULL, NULL, NULL) <=0 ) {
-        exit(20);
-      };
+    /* select() waits until pipeline is ready */
+    if (select(sfd + 1, &rdfs, NULL, NULL, NULL) <= 0)
+    {
+      exit(20);
+    };
 
-      /* now sleep until the pipeline is filled */
-      sleep = (long)((fcntl(sfd, F_GETPIPE_SZ)/bytesperframe)*1000000.0/rate); /* us */
-   	  sleep_ticks = ns_to_ticks(sleep*1000);
-      tpause(start_ticks, sleep_ticks);
-    }
-	
-    /**********************************************************************/
-    /* main loop                                                          */
-    /**********************************************************************/
+    /* now sleep until the pipeline is filled */
+    sleep = (long)((fcntl(sfd, F_GETPIPE_SZ) / bytesperframe) * 1000000.0 / rate); /* us */
+    mtime.tv_sec = 0;
+    mtime.tv_nsec = sleep * 1000;
+    nanosleep(&mtime, NULL);
+  }
 
+  /* get time */
+  if (clock_gettime(CLOCK_MONOTONIC, &mtime) < 0)
+  {
+    exit(21);
+  }
+
+  /**********************************************************************/
+  /* main loop                                                          */
+  /**********************************************************************/
     badloops = 0;
     badframes = 0;
     badreads = 0;
@@ -877,6 +848,8 @@ int main(int argc, char *argv[])
           }
           refreshmem(optr, wnext*bytesperframe);
           clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &mtime, NULL);
+          clock_gettime(CLOCK_MONOTONIC, &ttime);
+          nsloop(shift-difftimens(mtime, ttime));
           /* write a chunk, this comes first immediately after waking up */
 #ifdef ALSANC
           /* here we use snd_pcm_writei_nc (if available in patched ALSA
@@ -960,32 +933,27 @@ int main(int argc, char *argv[])
      /* this is the same code as below, but with all verbosity, printf,
         offset and statistics code removed */
      startcount = hwbufsize/(2*olen);
-  	 /* get time */
-     clock_gettime(CLOCK_MONOTONIC, &mtime);   
-     start_ticks = read_tsc();
-	 
+     if (clock_gettime(CLOCK_MONOTONIC, &mtime) < 0) {
+          exit(19);
+      }
+
       while (1) {
           /* start playing when half of hwbuffer is filled */
-          if (count == startcount)  snd_pcm_start(pcm_handle);
+          if (count == startcount)  snd_pcm_start(pcm_handle);  
           frames = olen;
-        
-          snd_pcm_avail(pcm_handle);
+          avail = snd_pcm_avail(pcm_handle);
           snd_pcm_mmap_begin(pcm_handle, &areas, &offset, &frames);
           ilen = frames * bytesperframe;
           iptr = areas[0].addr + offset * bytesperframe;
           memclean(iptr, ilen);
           s = read(sfd, iptr, ilen);
-      if (s == 0) /* done */
-        break;      
       if (slowcp) {
-        copy_ticks = read_tsc();
         tbufs[0] = iptr;
         tbufs[nrcp] = iptr;
         for (k=1; k <= nrcp; k++) {
           /* short active pause before before cprefresh
-            (too short for sleeps) */
-          copy_ticks += csec_ticks;
-          tpause(copy_ticks);
+          (too short for sleeps) */
+          nsloop(csec);
           memclean((char*)(tbufs[k]), ilen);
           cprefresh((char*)(tbufs[k]), (char*)(tbufs[k-1]), ilen);
           memclean((char*)(tbufs[k-1]), ilen);
@@ -998,32 +966,29 @@ int main(int argc, char *argv[])
           cprefresh((char*)iptr, (char*)tbuf, ilen);
         }
       }
-	    start_ticks += nsec_ticks;
-      mtime.tv_nsec += (nsec-150000ul);
-      if (mtime.tv_nsec > 999999999) {
-        mtime.tv_sec++;
-        mtime.tv_nsec -= 1000000000;
-      }      
-      while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &mtime, NULL) != 0);
-    
-
-          tpause(start_ticks - shift);
-          while (start_ticks > __rdtsc());
+          mtime.tv_nsec += nsec;
+          if (mtime.tv_nsec > 999999999) {
+            mtime.tv_nsec -= 1000000000;
+            mtime.tv_sec++;
+          }
+          refreshmem(iptr, s);
+          clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &mtime, NULL);
+          clock_gettime(CLOCK_MONOTONIC, &ttime);
+          nsloop(shift-difftimens(mtime, ttime));
           snd_pcm_mmap_commit(pcm_handle, offset, frames);
-          clock_gettime(CLOCK_MONOTONIC, &mtime);
-          count++;
           icount += s;
           ocount += s;
-
+          count++;
+          if (s == 0) /* done */
+              break;
       }
     } else if (access == SND_PCM_ACCESS_MMAP_INTERLEAVED && stripped) {
      /* this is the same code as below, but with all verbosity, printf  and
         statistics code removed */
      startcount = hwbufsize/(2*olen);
-  	 /* get time */
-     clock_gettime(CLOCK_MONOTONIC, &mtime);   
-     start_ticks = read_tsc();
-	 
+     if (clock_gettime(CLOCK_MONOTONIC, &mtime) < 0) {
+          exit(19);
+      }
       for (count=1, off=looperr; 1; count++, off+=looperr) {
           /* start playing when half of hwbuffer is filled */
           if (count == startcount)  snd_pcm_start(pcm_handle);
@@ -1033,49 +998,41 @@ int main(int argc, char *argv[])
               frames++;
               off -= 1.0;
           }
-  
           avail = snd_pcm_avail(pcm_handle);
           snd_pcm_mmap_begin(pcm_handle, &areas, &offset, &frames);
           ilen = frames * bytesperframe;
           iptr = areas[0].addr + offset * bytesperframe;
           memclean(iptr, ilen);
           s = read(sfd, iptr, ilen);
-          if (s == 0) /* done */
-            break;      
-          if (slowcp) {
-            copy_ticks = read_tsc();
-            tbufs[0] = iptr;
-            tbufs[nrcp] = iptr;
-            for (k=1; k <= nrcp; k++) {
-              /* short active pause before before cprefresh
-                (too short for sleeps) */
-              copy_ticks += csec_ticks;
-              tpause(copy_ticks);
-              memclean((char*)(tbufs[k]), ilen);
-              cprefresh((char*)(tbufs[k]), (char*)(tbufs[k-1]), ilen);
-              memclean((char*)(tbufs[k-1]), ilen);
-            }
-          } else {
-            for (k=nrcp; k; k--) {
-              memclean((char*)tbuf, ilen);
-              cprefresh((char*)tbuf, (char*)iptr, ilen);
-              memclean((char*)iptr, ilen);
-              cprefresh((char*)iptr, (char*)tbuf, ilen);
-            }
+      if (slowcp) {
+        tbufs[0] = iptr;
+        tbufs[nrcp] = iptr;
+        for (k=1; k <= nrcp; k++) {
+          /* short active pause before before cprefresh
+          (too short for sleeps) */
+          nsloop(csec);
+          memclean((char*)(tbufs[k]), ilen);
+          cprefresh((char*)(tbufs[k]), (char*)(tbufs[k-1]), ilen);
+          memclean((char*)(tbufs[k-1]), ilen);
+        }
+      } else {
+        for (k=nrcp; k; k--) {
+          memclean((char*)tbuf, ilen);
+          cprefresh((char*)tbuf, (char*)iptr, ilen);
+          memclean((char*)iptr, ilen);
+          cprefresh((char*)iptr, (char*)tbuf, ilen);
+        }
+      }
+          mtime.tv_nsec += nsec;
+          if (mtime.tv_nsec > 999999999) {
+            mtime.tv_nsec -= 1000000000;
+            mtime.tv_sec++;
           }
-
-          start_ticks += nsec_ticks;
-      mtime.tv_nsec += (nsec-150000ul);
-      if (mtime.tv_nsec > 999999999) {
-        mtime.tv_sec++;
-        mtime.tv_nsec -= 1000000000;
-      }      
-      while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &mtime, NULL) != 0);
-
-          tpause(start_ticks - shift);
-          while (start_ticks > __rdtsc());
+          refreshmem(iptr, s);
+          clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &mtime, NULL);
+          clock_gettime(CLOCK_MONOTONIC, &ttime);
+          nsloop(shift-difftimens(mtime, ttime));
           snd_pcm_mmap_commit(pcm_handle, offset, frames);
-          clock_gettime(CLOCK_MONOTONIC, &mtime);          
           icount += s;
           ocount += s;
           if (s == 0) /* done */
@@ -1084,16 +1041,16 @@ int main(int argc, char *argv[])
     } else if (access == SND_PCM_ACCESS_MMAP_INTERLEAVED) {
       /* mmap access */
       /* why does start threshold not work ??? */
+     if (verbose)
+         fprintf(stderr, "playhrt: Using mmap access.\n");
+     startcount = hwbufsize/(2*olen);
+     if (clock_gettime(CLOCK_MONOTONIC, &mtime) < 0) {
+          fprintf(stderr, "playhrt: Cannot get monotonic clock.\n");
+          exit(19);
+      }
       if (verbose)
-        fprintf(stderr, "playhrt: Using mmap access.\n");
-      startcount = hwbufsize/(2*olen);
-      /* get time */
-      clock_gettime(CLOCK_MONOTONIC, &ttime);
-      start_ticks = read_tsc();
-      nsec2timespec(&mtime, ticks_to_ns(start_ticks) );
-      if (verbose)
-        fprintf(stderr, "playhrt: Start time (%ld sec %ld nsec).\n",
-                        mtime.tv_sec, mtime.tv_nsec);
+         fprintf(stderr, "playhrt: Start time (%ld sec %ld nsec).\n",
+                         mtime.tv_sec, mtime.tv_nsec);
       sumavg= 0;
       checktime = 0;
       for (count=1, off=looperr; 1; count++, off+=looperr) {
@@ -1159,14 +1116,12 @@ int main(int argc, char *argv[])
           /* in --mmap mode we read directly into mmaped space without internal buffer */
           s = read(sfd, iptr, ilen);
       if (slowcp) {
-        copy_ticks = read_tsc();
         tbufs[0] = iptr;
         tbufs[nrcp] = iptr;
         for (k=1; k <= nrcp; k++) {
           /* short active pause before before cprefresh
-            (too short for sleeps) */
-          copy_ticks += csec_ticks;
-          tpause(copy_ticks);
+          (too short for sleeps) */
+          nsloop(csec);
           memclean((char*)(tbufs[k]), ilen);
           cprefresh((char*)(tbufs[k]), (char*)(tbufs[k-1]), ilen);
           memclean((char*)(tbufs[k-1]), ilen);
@@ -1181,30 +1136,29 @@ int main(int argc, char *argv[])
       }
 
           /* compute time for next wakeup */
-          last_ticks = start_ticks;
-		  start_ticks += nsec_ticks;
-          nsec2timespec(&mtime, ticks_to_ns(start_ticks) );
+          mtime.tv_nsec += nsec;
+          if (mtime.tv_nsec > 999999999) {
+            mtime.tv_nsec -= 1000000000;
+            mtime.tv_sec++;
+          }
+
+
           /* we refresh the new data before sleeping and commiting */
           refreshmem(iptr, s);
 
           /* debug:  check that we really sleep to some time in the future */
           if (countdelay) {
-            timecheck_ticks = read_tsc();
-            if (timecheck_ticks > start_ticks)
+            clock_gettime(CLOCK_MONOTONIC, &mtimecheck);
+            if (mtimecheck.tv_sec > mtime.tv_sec || (mtimecheck.tv_sec == mtime.tv_sec && mtimecheck.tv_nsec > mtime.tv_nsec))
                 nrdelays += 1;
           }
           if (verbose > 1 && nrdelays > 0 && count % 4096 == 0) {
               fprintf(stderr, "playhrt: Number of delayed loops: %ld (%ld sec %ld nsec).\n", nrdelays, mtime.tv_sec, mtime.tv_nsec);
           }
-      ttime.tv_nsec += (nsec-200000ul);
-      if (ttime.tv_nsec > 999999999) {
-        ttime.tv_sec++;
-        ttime.tv_nsec -= 1000000000;
-      }      
-      while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &ttime, NULL) != 0);
 
-          tpause(last_ticks, nsec_ticks-shift);
-		  while (start_ticks > __rdtsc());
+          clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &mtime, NULL);
+          clock_gettime(CLOCK_MONOTONIC, &ttime);
+          nsloop(shift-difftimens(mtime, ttime));
           snd_pcm_mmap_commit(pcm_handle, offset, frames);
           if (s < 0) {
               fprintf(stderr, "playhrt: Read error.\n");

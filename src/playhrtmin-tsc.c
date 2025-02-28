@@ -125,9 +125,10 @@ long ns_to_ticks(long ns)
   return (x);
 }
 
+
 int main(int argc, char *argv[])
 {
-  int sfd, s, nrchannels, startcount,
+  int sfd, ifd, s, nrchannels, startcount,
       stripped, innetbufsize, nrcp, slowcp, k, i;
   long blen, ilen, olen, extra, loopspersec, sleep,
       nsec, csec, shift;
@@ -341,6 +342,20 @@ int main(int argc, char *argv[])
   /* get tsc frequency */
   tsc_freq_hz = get_tsc_freq();
 
+  /* set max tpause time */
+  ifd = open("/sys/devices/system/cpu/umwait_control/max_time", O_WRONLY);
+  if (ifd != -1)
+  {
+    write(ifd,"1000000", 7);
+    close(ifd);
+  }   
+  else
+  {
+    fprintf(stderr, "Cannot set umwait max_time.\n");
+    exit(2);
+  }
+  
+ 
   bytesperframe = bytespersample * nrchannels;
   /* check some arguments and set some parameters */
   if ((host == NULL || port == NULL) && sfd < 0)
@@ -585,7 +600,7 @@ int main(int argc, char *argv[])
         }
       }
 	  start_ticks += nsec_ticks;
-      mtime.tv_nsec += (nsec-150000ul);
+      mtime.tv_nsec += (nsec-200000ul);
       if (mtime.tv_nsec > 999999999) {
         mtime.tv_sec++;
         mtime.tv_nsec -= 1000000000;
