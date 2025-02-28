@@ -5,7 +5,7 @@ This file is part of frankl's stereo utilities.
 See the file License.txt of the distribution and
 http://www.gnu.org/licenses/gpl.txt for license details.
 */
-
+#define _GNU_SOURCE
 #include "version.h"
 #include "net.h"
 #include <sys/types.h>
@@ -398,6 +398,24 @@ long ns_to_ticks(long ns)
   x *= tsc_freq_hz;
   x /= 1000000000ull;
   return (x);
+}
+
+struct timespec ns_to_timespec(const long nsec)
+{
+	struct timespec ts;
+	long rem;
+
+	if (!nsec)
+		return (struct timespec) {0, 0};
+
+	ts.tv_sec = div_s64_rem(nsec, 1000000000L, &rem);
+	if (unlikely(rem < 0)) {
+		ts.tv_sec--;
+		rem += 1000000000L;
+	}
+	ts.tv_nsec = rem;
+
+	return ts;
 }
 
 int main(int argc, char *argv[])
@@ -867,7 +885,7 @@ int main(int argc, char *argv[])
   if (sleep > 0)
   {
     sleep_ticks = ns_to_ticks(sleep * 1000);
-    tpause(start_ticks, sleep_ticks);
+    tpause(start_ticks + sleep_ticks);
 
     /* waits until pipeline is filled */
   }
@@ -886,7 +904,7 @@ int main(int argc, char *argv[])
     /* now sleep until the pipeline is filled */
     sleep = (long)((fcntl(sfd, F_GETPIPE_SZ) / bytesperframe) * 1000000.0 / rate); /* us */
     sleep_ticks = ns_to_ticks(sleep * 1000);
-    tpause(start_ticks, sleep_ticks);
+    tpause(start_ticks + sleep_ticks);
   }
 
   /**********************************************************************/
@@ -1194,7 +1212,7 @@ int main(int argc, char *argv[])
     /* get time */
     clock_gettime(CLOCK_MONOTONIC, &ttime);
     start_ticks = read_tsc();
-    nsec2timespec(&mtime, ticks_to_ns(start_ticks));
+    mtime = ns_to_timespec(ticks_to_ns(start_ticks));
     if (verbose)
       fprintf(stderr, "playhrt: Start time (%ld sec %ld nsec).\n",
               mtime.tv_sec, mtime.tv_nsec);
@@ -1304,7 +1322,7 @@ int main(int argc, char *argv[])
       /* compute time for next wakeup */
       last_ticks = start_ticks;
       start_ticks += nsec_ticks;
-      nsec2timespec(&mtime, ticks_to_ns(start_ticks));
+      mtime = ns_to_timespec(ticks_to_ns(start_ticks));
       /* we refresh the new data before sleeping and commiting */
       refreshmem(iptr, s);
 
@@ -1328,7 +1346,7 @@ int main(int argc, char *argv[])
       while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &ttime, NULL) != 0)
         ;
 
-      _tpause(1, last_ticks, nsec_ticks - shift);
+      _tpause(1, start_ticks - shift);
       while (start_ticks > __rdtsc())
         ;
       snd_pcm_mmap_commit(pcm_handle, offset, frames);
