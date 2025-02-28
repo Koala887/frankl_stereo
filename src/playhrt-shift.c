@@ -336,8 +336,6 @@ long long get_tsc_freq(void)
     fprintf(stderr, "Perf system doesn't support user time\n");
     return 1;
   }
-  //printf("TSC-Mult: %u \n", pc->time_mult);
-  //printf("TSC-Shift: %u \n", pc->time_shift);
   close(fd);
 
   __uint128_t x = 1000000000ull;
@@ -432,11 +430,6 @@ int main(int argc, char *argv[])
         {0,         0,                 0,  0 }
     };
 
-    /* avoid waiting 50000 ns collecting more sleep requests */
-    prctl(PR_SET_TIMERSLACK, 1L);
-
-  /* get tsc frequency */
-  tsc_freq_hz = get_tsc_freq();
 
     if (argc == 1) {
        usage();
@@ -590,6 +583,14 @@ int main(int argc, char *argv[])
           usage();
           exit(2);
         }
+    }
+    /* avoid waiting 50000 ns collecting more sleep requests */
+    prctl(PR_SET_TIMERSLACK, 1L);
+
+    /* get tsc frequency */
+    tsc_freq_hz = get_tsc_freq();
+    {
+      fprintf(stderr, "playhrt: TSC Frequency is %lld Hz.\n", tsc_freq_hz);
     }
     bytesperframe = bytespersample*nrchannels;
     /* check some arguments and set some parameters */
@@ -1042,8 +1043,10 @@ int main(int argc, char *argv[])
     } else if (access == SND_PCM_ACCESS_MMAP_INTERLEAVED) {
       /* mmap access */
       /* why does start threshold not work ??? */
-     if (verbose)
-         fprintf(stderr, "playhrt: Using mmap access.\n");
+    if (verbose){
+      fprintf(stderr, "playhrt: Using mmap access.\n");
+      fprintf(stderr, "playhrt: Shift time is %ld nsec).\n", shift);
+    }
      startcount = hwbufsize/(2*olen);
      if (clock_gettime(CLOCK_MONOTONIC, &mtime) < 0) {
           fprintf(stderr, "playhrt: Cannot get monotonic clock.\n");

@@ -79,6 +79,7 @@ int main(int argc, char *argv[]) {
     min = 0;
     max = 0;
     dev =0;
+    printf("Interval: %ld \n", dint);
     clock_gettime(MYCLOCK, &res);
     last = res;
     
@@ -143,6 +144,8 @@ int main(int argc, char *argv[]) {
     min = 0;
     max = 0;
     dev =0;
+    printf("Interval: %ld \n", dint);
+    printf("Shiftdelay: %ld \n", shift);    
     for(i=0; i<21; count[i]=0, i++);
 
     clock_gettime(MYCLOCK, &res);

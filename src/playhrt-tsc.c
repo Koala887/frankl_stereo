@@ -330,8 +330,6 @@ long long get_tsc_freq(void)
     fprintf(stderr, "Perf system doesn't support user time\n");
     return 1;
   }
-  printf("TSC-Mult: %u \n", pc->time_mult);
-  printf("TSC-Shift: %u \n", pc->time_shift);
   close(fd);
 
   __uint128_t x = 1000000000ull;
@@ -636,6 +634,10 @@ int main(int argc, char *argv[])
 
   /* get tsc frequency */
   tsc_freq_hz = get_tsc_freq();
+  if (verbose)
+  {
+    fprintf(stderr, "playhrt: TSC Frequency is %lld Hz.\n", tsc_freq_hz);
+  }
 
   /* set max tpause time */
   ifd = open("/sys/devices/system/cpu/umwait_control/max_time", O_WRONLY);
@@ -646,7 +648,7 @@ int main(int argc, char *argv[])
   }
   else
   {
-    fprintf(stderr, "Cannot set umwait max_time.\n");
+    fprintf(stderr, "playhrt: Cannot set umwait max_time.\n");
     exit(2);
   }
 
@@ -1192,8 +1194,10 @@ int main(int argc, char *argv[])
   {
     /* mmap access */
     /* why does start threshold not work ??? */
-    if (verbose)
+    if (verbose){
       fprintf(stderr, "playhrt: Using mmap access.\n");
+      fprintf(stderr, "playhrt: Shift time is %ld nsec).\n", shift);
+    }
     startcount = hwbufsize / (2 * olen);
     /* get time */
     clock_gettime(CLOCK_MONOTONIC, &ttime);
