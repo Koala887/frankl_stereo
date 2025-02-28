@@ -193,8 +193,8 @@ int main(int argc, char *argv[])
     for (first = 100, i = 0; i < nloops + 99; i++)
     {
       start_ticks += step_ticks;
-      sleep_ns(step/4*3);
-      tpause(start_ticks - shift);
+      sleep_ns(step-200000ull);
+      _tpause(1, start_ticks - shift);
       do
       {
         end_ticks = __rdtsc();

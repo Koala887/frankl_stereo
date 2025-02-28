@@ -609,7 +609,7 @@ int main(int argc, char *argv[])
 
       
       //tpause(start_ticks - 100000ull);
-      tpause(start_ticks - shift);
+      _tpause(1, start_ticks - shift);
       while (start_ticks > __rdtsc());
       snd_pcm_mmap_commit(pcm_handle, offset, frames);
       clock_gettime(CLOCK_MONOTONIC, &mtime);
