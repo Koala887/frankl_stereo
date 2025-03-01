@@ -212,7 +212,7 @@ int main(int argc, char *argv[]) {
     max = 0;
     dev =0;
     printf("Interval: %ld \n", dint);
-    printf("Shiftdelay: %ld \n", shift);
+    printf("Shiftdelay: %d \n", shift);
     for(i=0; i<21; count[i]=0, i++);
 
     clock_gettime(MYCLOCK, &res);
