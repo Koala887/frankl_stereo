@@ -100,7 +100,8 @@ static inline int tpause(unsigned long long end)
   int i, loops;
   long sleep;
   unsigned long long tsc = read_tsc();
-  if (tsc > end) return (0);
+  if (tsc > end)
+    return (0);
   long step = (end - tsc);
   /* maximum sleep time for tpause is 100000 */
   loops = (step / 100000) + 1;
@@ -133,8 +134,8 @@ int main(int argc, char *argv[])
 {
   struct sockaddr_in serv_addr;
   int listenfd, connfd, ifd, s, moreinput, optval = 1, rate,
-      bytesperframe, optc, interval, innetbufsize, nrcp,
-      outnetbufsize, tcpnodelay, flag;
+                                           bytesperframe, optc, interval, innetbufsize, nrcp,
+                                           outnetbufsize, tcpnodelay, flag;
   long blen, hlen, ilen, olen, outpersec, loopspersec, nsec, count, wnext, shift;
   long long icount, ocount;
   unsigned long long start_ticks, nsec_ticks;
@@ -171,7 +172,7 @@ int main(int argc, char *argv[])
       {"extra-bytes-per-second", required_argument, 0, 'e'},
       {"in-net-buffer-size", required_argument, 0, 'K'},
       {"out-net-buffer-size", required_argument, 0, 'L'},
-      {"tcp-nodelay", no_argument, 0, 'T' },
+      {"tcp-nodelay", no_argument, 0, 'T'},
       {"overwrite", required_argument, 0, 'O'}, /* not used, ignored */
       {"interval", no_argument, 0, 'I'},
       {"verbose", no_argument, 0, 'v'},
@@ -332,15 +333,15 @@ int main(int argc, char *argv[])
   ifd = open("/sys/devices/system/cpu/umwait_control/max_time", O_WRONLY);
   if (ifd != -1)
   {
-    write(ifd,"1000000", 7);
+    write(ifd, "1000000", 7);
     close(ifd);
-  }   
+  }
   else
   {
     fprintf(stderr, "Cannot set umwait max_time.\n");
     exit(2);
   }
-  
+
   /* check some arguments, open files and set some parameters */
   if (outfile)
   {
@@ -377,9 +378,10 @@ int main(int argc, char *argv[])
     {
       exit(23);
     }
-    if (tcpnodelay != 0 && setsockopt(ifd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)));    
-    {  
-        exit(31);
+    if (tcpnodelay != 0 && setsockopt(ifd, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(int)))
+      ;
+    {
+      exit(31);
     }
   }
 
@@ -444,9 +446,10 @@ int main(int argc, char *argv[])
     {
       exit(30);
     }
-    if (tcpnodelay != 0 && setsockopt(listenfd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)));    
-    {  
-        exit(31);
+    if (tcpnodelay != 0 && setsockopt(listenfd, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(int)))
+      ;
+    {
+      exit(31);
     }
     memset(&serv_addr, '0', sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
@@ -486,7 +489,7 @@ int main(int argc, char *argv[])
     wnext = iptr - optr;
   else
     wnext = olen;
-  /* get time */  
+  /* get time */
   clock_gettime(CLOCK_MONOTONIC, &mtime);
   start_ticks = read_tsc();
   /* main loop */
@@ -494,17 +497,20 @@ int main(int argc, char *argv[])
   for (count = 1, off = looperr; 1; count++, off += looperr)
   {
     start_ticks += nsec_ticks;
-      
-    mtime.tv_nsec += (nsec-200000ul);
-    if (mtime.tv_nsec > 999999999) {
+
+    mtime.tv_nsec += (nsec - 200000ul);
+    if (mtime.tv_nsec > 999999999)
+    {
       mtime.tv_sec++;
       mtime.tv_nsec -= 1000000000;
     }
-    refreshmem((char *)optr, wnext);      
-    while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &mtime, NULL) != 0);
+    refreshmem((char *)optr, wnext);
+    while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &mtime, NULL) != 0)
+      ;
     //_tpause(1, start_ticks - 100000ull);
     _tpause(1, start_ticks - shift);
-    while (start_ticks > __rdtsc());
+    while (start_ticks > __rdtsc())
+      ;
 
     /* write a chunk, this comes first after waking from sleep */
     s = write(connfd, optr, wnext);

@@ -38,11 +38,11 @@ void usage()
 
 /* difference t2 - t1 in ns */
 inline long difftimens(struct timespec t1, struct timespec t2)
-{ 
-   long long l1, l2;
-   l1 = t1.tv_sec*1000000000 + t1.tv_nsec;
-   l2 = t2.tv_sec*1000000000 + t2.tv_nsec;
-   return (long)(l2-l1);
+{
+  long long l1, l2;
+  l1 = t1.tv_sec * 1000000000 + t1.tv_nsec;
+  l2 = t2.tv_sec * 1000000000 + t2.tv_nsec;
+  return (long)(l2 - l1);
 }
 
 long long tsc_freq_hz;
@@ -108,22 +108,24 @@ long ns_to_ticks(long ns)
 
 static inline long nsloop(long cnt)
 {
-  if (cnt < 0) return 0;
+  if (cnt < 0)
+    return 0;
   unsigned long long tsc = read_tsc();
   unsigned long long end = tsc + ns_to_ticks(cnt);
-  while (end > __rdtsc());
+  while (end > __rdtsc())
+    ;
   return 0;
 }
 
 int main(int argc, char *argv[])
 {
   int sfd, s, verbose, nrchannels, startcount,
-        stripped, innetbufsize, nrcp, slowcp, k, i, tcpnodelay, flag;
+      stripped, innetbufsize, nrcp, slowcp, k, i, tcpnodelay, flag;
   long blen, ilen, olen, extra, loopspersec, sleep,
       nsec, csec, shift;
   long long count;
-    void *buf, *iptr, *tbuf, *tbufs[1024];
-    struct timespec mtime, ttime;
+  void *buf, *iptr, *tbuf, *tbufs[1024];
+  struct timespec mtime, ttime;
   double looperr, extraerr, extrabps;
   snd_pcm_t *pcm_handle;
   snd_pcm_hw_params_t *hwparams;
@@ -133,7 +135,7 @@ int main(int argc, char *argv[])
   int optc, nonblock, rate, bytespersample, bytesperframe;
   snd_pcm_uframes_t hwbufsize, periodsize, offset, frames;
   snd_pcm_access_t access;
-  
+
   const snd_pcm_channel_area_t *areas;
 
   /* read command line options */
@@ -152,7 +154,7 @@ int main(int argc, char *argv[])
       {"period-size", required_argument, 0, 'P'},
       {"device", required_argument, 0, 'd'},
       {"extra-bytes-per-second", required_argument, 0, 'e'},
-      {"shift", required_argument, 0, 'x'},      
+      {"shift", required_argument, 0, 'x'},
       {"number-copies", required_argument, 0, 'R'},
       {"slow-copies", no_argument, 0, 'C'},
       {"sleep", required_argument, 0, 'D'},
@@ -162,7 +164,7 @@ int main(int argc, char *argv[])
       {"non-blocking-write", no_argument, 0, 'N'},
       {"stripped", no_argument, 0, 'X'},
       {"overwrite", required_argument, 0, 'O'},
-      {"tcp-nodelay", no_argument, 0, 'T' },        
+      {"tcp-nodelay", no_argument, 0, 'T'},
       {"verbose", no_argument, 0, 'v'},
       {"no-buf-stats", no_argument, 0, 'y'},
       {"no-delay-stats", no_argument, 0, 'j'},
@@ -175,7 +177,7 @@ int main(int argc, char *argv[])
 
   /* get tsc frequency */
   tsc_freq_hz = get_tsc_freq();
-  
+
   if (argc == 1)
   {
     usage();
@@ -210,7 +212,7 @@ int main(int argc, char *argv[])
   stripped = 1;
 
   shift = 100000;
-  tcpnodelay = 0;    
+  tcpnodelay = 0;
   while ((optc = getopt_long(argc, argv, "r:p:Sb:D:i:n:s:f:k:Mc:P:d:R:Ce:m:K:o:NXO:x:TvyjVh",
                              longoptions, &optind)) != -1)
   {
@@ -311,13 +313,13 @@ int main(int argc, char *argv[])
       nonblock = 1;
       break;
     case 'x':
-      shift = atoi(optarg); 
-      break;      
+      shift = atoi(optarg);
+      break;
     case 'O':
       break;
     case 'T':
       tcpnodelay = 1;
-      break;          
+      break;
     case 'v':
       verbose += 1;
       break;
@@ -364,13 +366,15 @@ int main(int argc, char *argv[])
       ilen = bytesperframe * (olen + 1);
   }
   /* temporary buffer */
-    for (i=0; i <= nrcp; i++) {
-        if (posix_memalign(tbufs+i, 4096, 2*olen*bytesperframe)) {
-            fprintf(stderr, "myplayhrt: Cannot allocate buffer for cleaning.\n");
-            exit(2);
-        }
+  for (i = 0; i <= nrcp; i++)
+  {
+    if (posix_memalign(tbufs + i, 4096, 2 * olen * bytesperframe))
+    {
+      fprintf(stderr, "myplayhrt: Cannot allocate buffer for cleaning.\n");
+      exit(2);
     }
-    tbuf = tbufs[1];
+  }
+  tbuf = tbufs[1];
 
   /* need big enough input buffer */
   if (blen < 3 * ilen)
@@ -381,7 +385,7 @@ int main(int argc, char *argv[])
     looperr = 0.0;
   else
     looperr = (1.0 * rate) / loopspersec - 1.0 * olen;
-  
+
   /* for mmap try to set hwbuffer to multiple of output per loop */
   if (access == SND_PCM_ACCESS_MMAP_INTERLEAVED)
   {
@@ -413,9 +417,10 @@ int main(int argc, char *argv[])
         exit(23);
       }
     }
-    if (tcpnodelay != 0 && setsockopt(sfd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)));    
-    {  
-        exit(31);
+    if (tcpnodelay != 0 && setsockopt(sfd, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(int)))
+      ;
+    {
+      exit(31);
     }
   }
   /**********************************************************************/
@@ -554,7 +559,8 @@ int main(int argc, char *argv[])
     while (1)
     {
       /* start playing when half of hwbuffer is filled */
-      if (count == startcount)  snd_pcm_start(pcm_handle);      
+      if (count == startcount)
+        snd_pcm_start(pcm_handle);
       frames = olen;
       snd_pcm_avail(pcm_handle);
       snd_pcm_mmap_begin(pcm_handle, &areas, &offset, &frames);
@@ -562,23 +568,28 @@ int main(int argc, char *argv[])
       iptr = areas[0].addr + offset * bytesperframe;
       memclean(iptr, ilen);
       s = read(sfd, iptr, ilen);
-      if (slowcp) {
+      if (slowcp)
+      {
         tbufs[0] = iptr;
         tbufs[nrcp] = iptr;
-        for (k=1; k <= nrcp; k++) {
+        for (k = 1; k <= nrcp; k++)
+        {
           /* short active pause before before cprefresh
           (too short for sleeps) */
           nsloop(csec);
-          memclean((char*)(tbufs[k]), ilen);
-          cprefresh((char*)(tbufs[k]), (char*)(tbufs[k-1]), ilen);
-          memclean((char*)(tbufs[k-1]), ilen);
+          memclean((char *)(tbufs[k]), ilen);
+          cprefresh((char *)(tbufs[k]), (char *)(tbufs[k - 1]), ilen);
+          memclean((char *)(tbufs[k - 1]), ilen);
         }
-      } else {
-        for (k=nrcp; k; k--) {
-          memclean((char*)tbuf, ilen);
-          cprefresh((char*)tbuf, (char*)iptr, ilen);
-          memclean((char*)iptr, ilen);
-          cprefresh((char*)iptr, (char*)tbuf, ilen);
+      }
+      else
+      {
+        for (k = nrcp; k; k--)
+        {
+          memclean((char *)tbuf, ilen);
+          cprefresh((char *)tbuf, (char *)iptr, ilen);
+          memclean((char *)iptr, ilen);
+          cprefresh((char *)iptr, (char *)tbuf, ilen);
         }
       }
 
@@ -590,7 +601,7 @@ int main(int argc, char *argv[])
       }
       clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &mtime, NULL);
       clock_gettime(CLOCK_MONOTONIC, &ttime);
-      nsloop(shift-difftimens(mtime, ttime));
+      nsloop(shift - difftimens(mtime, ttime));
       snd_pcm_mmap_commit(pcm_handle, offset, frames);
       count++;
       if (s == 0) /* done */

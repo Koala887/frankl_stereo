@@ -85,8 +85,8 @@ long long get_tsc_freq(void)
     fprintf(stderr, "Perf system doesn't support user time\n");
     return 1;
   }
-  //printf("TSC-Mult: %u \n", pc->time_mult);
-  //printf("TSC-Shift: %u \n", pc->time_shift);
+  // printf("TSC-Mult: %u \n", pc->time_mult);
+  // printf("TSC-Shift: %u \n", pc->time_shift);
   close(fd);
 
   __uint128_t x = 1000000000ull;
@@ -115,10 +115,12 @@ long ns_to_ticks(long ns)
 
 static inline long nsloop(long cnt)
 {
-  if (cnt < 0) return 0;
+  if (cnt < 0)
+    return 0;
   unsigned long long tsc = read_tsc();
   unsigned long long end = tsc + ns_to_ticks(cnt);
-  while (end > __rdtsc());
+  while (end > __rdtsc())
+    ;
   return 0;
 }
 
@@ -167,7 +169,7 @@ int main(int argc, char *argv[])
       {"extra-bytes-per-second", required_argument, 0, 'e'},
       {"in-net-buffer-size", required_argument, 0, 'K'},
       {"out-net-buffer-size", required_argument, 0, 'L'},
-      {"tcp-nodelay", no_argument, 0, 'T' },
+      {"tcp-nodelay", no_argument, 0, 'T'},
       {"overwrite", required_argument, 0, 'O'}, /* not used, ignored */
       {"interval", no_argument, 0, 'I'},
       {"verbose", no_argument, 0, 'v'},
@@ -208,7 +210,7 @@ int main(int argc, char *argv[])
   nrcp = 0;
   innetbufsize = 0;
   outnetbufsize = 0;
-  shift = 100000; 
+  shift = 100000;
   tcpnodelay = 0;
 
   while ((optc = getopt_long(argc, argv, "p:o:b:i:D:n:m:X:Y:s:f:F:R:c:H:P:e:x:TvVIhd",
@@ -307,9 +309,9 @@ int main(int argc, char *argv[])
         outnetbufsize = 128;
       break;
     case 'x':
-      shift = atoi(optarg); 
+      shift = atoi(optarg);
     case 'O':
-      break;   /* ignored */
+      break; /* ignored */
     case 'T':
       tcpnodelay = 1;
       break;
@@ -360,13 +362,15 @@ int main(int argc, char *argv[])
   {
     ifd = fd_net(inhost, inport);
     if (innetbufsize != 0 &&
-            setsockopt(ifd, SOL_SOCKET, SO_RCVBUF, (void*)&innetbufsize, sizeof(int)) < 0) {
-                exit(23);
-        }
-        if (tcpnodelay != 0 && setsockopt(ifd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)));    
-        {
-            exit(31);
-        }
+        setsockopt(ifd, SOL_SOCKET, SO_RCVBUF, (void *)&innetbufsize, sizeof(int)) < 0)
+    {
+      exit(23);
+    }
+    if (tcpnodelay != 0 && setsockopt(ifd, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(int)))
+      ;
+    {
+      exit(31);
+    }
   }
   if (ramlps != 0 && rambps != 0)
   {
@@ -457,9 +461,10 @@ int main(int argc, char *argv[])
     {
       exit(30);
     }
-    if (tcpnodelay != 0 && setsockopt(listenfd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)));    
-    {  
-        exit(31);
+    if (tcpnodelay != 0 && setsockopt(listenfd, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(int)))
+      ;
+    {
+      exit(31);
     }
     memset(&serv_addr, '0', sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
@@ -522,7 +527,7 @@ int main(int argc, char *argv[])
     while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &mtime, NULL) != 0)
       ;
     clock_gettime(CLOCK_MONOTONIC, &ttime);
-    nsloop(shift-difftimens(mtime, ttime));      
+    nsloop(shift - difftimens(mtime, ttime));
     /* write a chunk, this comes first after waking from sleep */
     s = write(connfd, optr, wnext);
     if (s < 0)

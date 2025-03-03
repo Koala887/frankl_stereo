@@ -2,7 +2,6 @@
 VERSION=0.9.dev
 
 REFRESH=X8664
-# TCP_NODELAY=YES
 
 ARCH=$(shell uname -m)
 

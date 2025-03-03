@@ -96,7 +96,8 @@ static inline int tpause(unsigned long long end)
   int i, loops;
   long sleep;
   unsigned long long tsc = read_tsc();
-  if (tsc > end) return (0);
+  if (tsc > end)
+    return (0);
   long step = (end - tsc);
   /* maximum sleep time for tpause is 100000 */
   loops = (step / 100000) + 1;
@@ -124,7 +125,6 @@ long ns_to_ticks(long ns)
   x /= 1000000000ull;
   return (x);
 }
-
 
 int main(int argc, char *argv[])
 {
@@ -173,7 +173,7 @@ int main(int argc, char *argv[])
       {"non-blocking-write", no_argument, 0, 'N'},
       {"stripped", no_argument, 0, 'X'},
       {"overwrite", required_argument, 0, 'O'},
-      {"tcp-nodelay", no_argument, 0, 'T' },   
+      {"tcp-nodelay", no_argument, 0, 'T'},
       {"verbose", no_argument, 0, 'v'},
       {"no-buf-stats", no_argument, 0, 'y'},
       {"no-delay-stats", no_argument, 0, 'j'},
@@ -213,7 +213,7 @@ int main(int argc, char *argv[])
   innetbufsize = 0;
   shift = 1000;
   stripped = 1;
-  tcpnodelay = 0;    
+  tcpnodelay = 0;
   while ((optc = getopt_long(argc, argv, "r:p:Sb:D:i:n:s:f:k:Mc:P:d:R:Ce:x:m:K:o:NXO:TvyjVh",
                              longoptions, &optind)) != -1)
   {
@@ -320,7 +320,7 @@ int main(int argc, char *argv[])
       break;
     case 'T':
       tcpnodelay = 1;
-      break;   
+      break;
     case 'v':
       break;
     case 'X':
@@ -352,16 +352,15 @@ int main(int argc, char *argv[])
   ifd = open("/sys/devices/system/cpu/umwait_control/max_time", O_WRONLY);
   if (ifd != -1)
   {
-    write(ifd,"1000000", 7);
+    write(ifd, "1000000", 7);
     close(ifd);
-  }   
+  }
   else
   {
     fprintf(stderr, "Cannot set umwait max_time.\n");
     exit(2);
   }
-  
- 
+
   bytesperframe = bytespersample * nrchannels;
   /* check some arguments and set some parameters */
   if ((host == NULL || port == NULL) && sfd < 0)
@@ -379,7 +378,8 @@ int main(int argc, char *argv[])
   {
     csec = nsec / (8 * nrcp);
     csec_ticks = ns_to_ticks(csec);
-	if (csec_ticks > 100000) csec_ticks = 100000;
+    if (csec_ticks > 100000)
+      csec_ticks = 100000;
   }
   /* olen in frames written per loop */
   olen = rate / loopspersec;
@@ -394,11 +394,13 @@ int main(int argc, char *argv[])
   }
 
   /* temporary buffers */
-  for (i=0; i <= nrcp; i++) {
-      if (posix_memalign(tbufs+i, 4096, 2*olen*bytesperframe)) {
-          fprintf(stderr, "myplayhrt: Cannot allocate buffer for cleaning.\n");
-          exit(2);
-      }
+  for (i = 0; i <= nrcp; i++)
+  {
+    if (posix_memalign(tbufs + i, 4096, 2 * olen * bytesperframe))
+    {
+      fprintf(stderr, "myplayhrt: Cannot allocate buffer for cleaning.\n");
+      exit(2);
+    }
   }
   tbuf = tbufs[1];
 
@@ -444,11 +446,12 @@ int main(int argc, char *argv[])
         exit(23);
       }
     }
-    if (tcpnodelay != 0 && setsockopt(sfd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)));    
-    {  
-        fprintf(stderr, "playhrt: set TCP_NODELAY failed! \n");
-        exit(31);
-    }  
+    if (tcpnodelay != 0 && setsockopt(sfd, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(int)))
+      ;
+    {
+      fprintf(stderr, "playhrt: set TCP_NODELAY failed! \n");
+      exit(31);
+    }
   }
 
   /**********************************************************************/
@@ -577,7 +580,8 @@ int main(int argc, char *argv[])
     while (1)
     {
       /* start playing when half of hwbuffer is filled */
-      if (count == startcount)  snd_pcm_start(pcm_handle);
+      if (count == startcount)
+        snd_pcm_start(pcm_handle);
 
       frames = olen;
       snd_pcm_avail(pcm_handle);
@@ -587,45 +591,51 @@ int main(int argc, char *argv[])
       memclean(iptr, ilen);
       s = read(sfd, iptr, ilen);
       if (s == 0) /* done */
-        break;      
+        break;
 
-      if (slowcp) {
+      if (slowcp)
+      {
         copy_ticks = read_tsc();
         tbufs[0] = iptr;
         tbufs[nrcp] = iptr;
-        for (k=1; k <= nrcp; k++) {
+        for (k = 1; k <= nrcp; k++)
+        {
           /* short active pause before before cprefresh
             (too short for sleeps) */
           copy_ticks += csec_ticks;
           tpause(copy_ticks);
-          memclean((char*)(tbufs[k]), ilen);
-          cprefresh((char*)(tbufs[k]), (char*)(tbufs[k-1]), ilen);
-          memclean((char*)(tbufs[k-1]), ilen);
-        }
-      } else {
-        for (k=nrcp; k; k--) {
-          memclean((char*)tbuf, ilen);
-          cprefresh((char*)tbuf, (char*)iptr, ilen);
-          memclean((char*)iptr, ilen);
-          cprefresh((char*)iptr, (char*)tbuf, ilen);
+          memclean((char *)(tbufs[k]), ilen);
+          cprefresh((char *)(tbufs[k]), (char *)(tbufs[k - 1]), ilen);
+          memclean((char *)(tbufs[k - 1]), ilen);
         }
       }
-	  start_ticks += nsec_ticks;
-      mtime.tv_nsec += (nsec-200000ul);
-      if (mtime.tv_nsec > 999999999) {
+      else
+      {
+        for (k = nrcp; k; k--)
+        {
+          memclean((char *)tbuf, ilen);
+          cprefresh((char *)tbuf, (char *)iptr, ilen);
+          memclean((char *)iptr, ilen);
+          cprefresh((char *)iptr, (char *)tbuf, ilen);
+        }
+      }
+      start_ticks += nsec_ticks;
+      mtime.tv_nsec += (nsec - 200000ul);
+      if (mtime.tv_nsec > 999999999)
+      {
         mtime.tv_sec++;
         mtime.tv_nsec -= 1000000000;
-      }      
-      while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &mtime, NULL) != 0);
+      }
+      while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &mtime, NULL) != 0)
+        ;
 
-      
-      //tpause(start_ticks - 100000ull);
+      // tpause(start_ticks - 100000ull);
       _tpause(1, start_ticks - shift);
-      while (start_ticks > __rdtsc());
+      while (start_ticks > __rdtsc())
+        ;
       snd_pcm_mmap_commit(pcm_handle, offset, frames);
       clock_gettime(CLOCK_MONOTONIC, &mtime);
       count++;
-
     }
   }
   /* cleanup network connection and sound device */

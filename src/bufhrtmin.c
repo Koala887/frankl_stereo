@@ -105,7 +105,7 @@ int main(int argc, char *argv[])
       {"extra-bytes-per-second", required_argument, 0, 'e'},
       {"in-net-buffer-size", required_argument, 0, 'K'},
       {"out-net-buffer-size", required_argument, 0, 'L'},
-      {"tcp-nodelay", no_argument, 0, 'T' },
+      {"tcp-nodelay", no_argument, 0, 'T'},
       {"overwrite", required_argument, 0, 'O'}, /* not used, ignored */
       {"interval", no_argument, 0, 'I'},
       {"verbose", no_argument, 0, 'v'},
@@ -296,13 +296,15 @@ int main(int argc, char *argv[])
   {
     ifd = fd_net(inhost, inport);
     if (innetbufsize != 0 &&
-            setsockopt(ifd, SOL_SOCKET, SO_RCVBUF, (void*)&innetbufsize, sizeof(int)) < 0) {
+        setsockopt(ifd, SOL_SOCKET, SO_RCVBUF, (void *)&innetbufsize, sizeof(int)) < 0)
+    {
 
-                exit(23);
+      exit(23);
     }
-    if (tcpnodelay != 0 && setsockopt(ifd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)));    
-    {  
-        exit(31);
+    if (tcpnodelay != 0 && setsockopt(ifd, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(int)))
+      ;
+    {
+      exit(31);
     }
   }
   if (ramlps != 0 && rambps != 0)
@@ -397,9 +399,10 @@ int main(int argc, char *argv[])
     {
       exit(30);
     }
-    if (tcpnodelay != 0 && setsockopt(listenfd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)));    
-    {  
-        exit(31);
+    if (tcpnodelay != 0 && setsockopt(listenfd, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(int)))
+      ;
+    {
+      exit(31);
     }
     memset(&serv_addr, '0', sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;

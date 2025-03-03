@@ -80,7 +80,8 @@ static inline int tpause(unsigned long long end)
   int i, loops;
   long sleep;
   unsigned long long tsc = read_tsc();
-  if (tsc > end) return (0);
+  if (tsc > end)
+    return (0);
   long step = (end - tsc);
   /* maximum sleep time for tpause is 100000 */
   loops = (step / 100000) + 1;
@@ -98,11 +99,13 @@ static inline int sleep_ns(int step)
   struct timespec mtime;
   clock_gettime(CLOCK_MONOTONIC, &mtime);
   mtime.tv_nsec += (step);
-  if (mtime.tv_nsec > 999999999) {
+  if (mtime.tv_nsec > 999999999)
+  {
     mtime.tv_sec++;
     mtime.tv_nsec -= 1000000000;
-  }      
-  while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &mtime, NULL) != 0);
+  }
+  while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &mtime, NULL) != 0)
+    ;
   return (0);
 }
 
@@ -140,14 +143,14 @@ int main(int argc, char *argv[])
 
   /* avoid waiting 50000 ns collecting more sleep requests */
   prctl(PR_SET_TIMERSLACK, 1L);
-  
+
   /* set max tpause time */
   ifd = open("/sys/devices/system/cpu/umwait_control/max_time", O_WRONLY);
   if (ifd != -1)
   {
-    write(ifd,"1000000", 7);
+    write(ifd, "1000000", 7);
     close(ifd);
-  }   
+  }
   else
   {
     fprintf(stderr, "Cannot set umwait max_time.\n");
@@ -186,7 +189,8 @@ int main(int argc, char *argv[])
     printf("Shiftdelay: %d \n", shift);
     // calculate ticks per step
     step_ticks = ns_to_ticks(step);
-    for (i = 0; i < 21; count[i] = 0, i++);
+    for (i = 0; i < 21; count[i] = 0, i++)
+      ;
 
     start_ticks = read_tsc();
     last_ticks = start_ticks;
@@ -195,7 +199,7 @@ int main(int argc, char *argv[])
     for (first = 100, i = 0; i < nloops + 99; i++)
     {
       start_ticks += step_ticks;
-      sleep_ns(step-200000ull);
+      sleep_ns(step - 200000ull);
       _tpause(1, start_ticks - shift);
       do
       {

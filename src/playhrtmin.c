@@ -38,7 +38,7 @@ void usage()
 int main(int argc, char *argv[])
 {
   int sfd, s, verbose, nrchannels, startcount,
-        stripped, innetbufsize, nrcp, slowcp, k, tcpnodelay, flag;
+      stripped, innetbufsize, nrcp, slowcp, k, tcpnodelay, flag;
   long blen, ilen, olen, extra, loopspersec, sleep,
       nsec, csec;
   long long count;
@@ -53,7 +53,7 @@ int main(int argc, char *argv[])
   int optc, nonblock, rate, bytespersample, bytesperframe;
   snd_pcm_uframes_t hwbufsize, periodsize, offset, frames;
   snd_pcm_access_t access;
-  
+
   const snd_pcm_channel_area_t *areas;
 
   /* read command line options */
@@ -81,7 +81,7 @@ int main(int argc, char *argv[])
       {"non-blocking-write", no_argument, 0, 'N'},
       {"stripped", no_argument, 0, 'X'},
       {"overwrite", required_argument, 0, 'O'},
-      {"tcp-nodelay", no_argument, 0, 'T' },       
+      {"tcp-nodelay", no_argument, 0, 'T'},
       {"verbose", no_argument, 0, 'v'},
       {"no-buf-stats", no_argument, 0, 'y'},
       {"no-delay-stats", no_argument, 0, 'j'},
@@ -124,7 +124,7 @@ int main(int argc, char *argv[])
   innetbufsize = 0;
   verbose = 0;
   stripped = 1;
-  tcpnodelay = 0; 
+  tcpnodelay = 0;
 
   while ((optc = getopt_long(argc, argv, "r:p:Sb:D:i:n:s:f:k:Mc:P:d:R:Ce:m:K:o:NXO:TvyjVh",
                              longoptions, &optind)) != -1)
@@ -291,7 +291,7 @@ int main(int argc, char *argv[])
     looperr = 0.0;
   else
     looperr = (1.0 * rate) / loopspersec - 1.0 * olen;
-  
+
   /* for mmap try to set hwbuffer to multiple of output per loop */
   if (access == SND_PCM_ACCESS_MMAP_INTERLEAVED)
   {
@@ -323,10 +323,11 @@ int main(int argc, char *argv[])
         exit(23);
       }
     }
-    if (tcpnodelay != 0 && setsockopt(sfd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)));    
-    {  
-        fprintf(stderr, "playhrt: set TCP_NODELAY failed! \n");
-        exit(31);
+    if (tcpnodelay != 0 && setsockopt(sfd, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(int)))
+      ;
+    {
+      fprintf(stderr, "playhrt: set TCP_NODELAY failed! \n");
+      exit(31);
     }
   }
 
@@ -466,7 +467,8 @@ int main(int argc, char *argv[])
     while (1)
     {
       /* start playing when half of hwbuffer is filled */
-      if (count == startcount)  snd_pcm_start(pcm_handle);      
+      if (count == startcount)
+        snd_pcm_start(pcm_handle);
       frames = olen;
       snd_pcm_avail(pcm_handle);
       snd_pcm_mmap_begin(pcm_handle, &areas, &offset, &frames);
