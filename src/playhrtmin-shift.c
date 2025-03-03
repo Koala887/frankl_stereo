@@ -418,7 +418,6 @@ int main(int argc, char *argv[])
       }
     }
     if (tcpnodelay != 0 && setsockopt(sfd, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(int)))
-      ;
     {
       exit(31);
     }

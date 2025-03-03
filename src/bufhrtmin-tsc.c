@@ -133,9 +133,9 @@ long ns_to_ticks(long ns)
 int main(int argc, char *argv[])
 {
   struct sockaddr_in serv_addr;
-  int listenfd, connfd, ifd, s, moreinput, optval = 1, rate,
-                                           bytesperframe, optc, interval, innetbufsize, nrcp,
-                                           outnetbufsize, tcpnodelay, flag;
+  int listenfd, connfd, ifd, s, moreinput, optval, rate,
+      bytesperframe, optc, interval, innetbufsize, nrcp,
+      outnetbufsize, tcpnodelay, flag;
   long blen, hlen, ilen, olen, outpersec, loopspersec, nsec, count, wnext, shift;
   long long icount, ocount;
   unsigned long long start_ticks, nsec_ticks;
@@ -187,6 +187,7 @@ int main(int argc, char *argv[])
   }
   /* defaults */
   flag = 1;
+  optval = 1;
   port = NULL;
   outfile = NULL;
   blen = 65536;
@@ -379,7 +380,6 @@ int main(int argc, char *argv[])
       exit(23);
     }
     if (tcpnodelay != 0 && setsockopt(ifd, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(int)))
-      ;
     {
       exit(31);
     }
@@ -447,7 +447,6 @@ int main(int argc, char *argv[])
       exit(30);
     }
     if (tcpnodelay != 0 && setsockopt(listenfd, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(int)))
-      ;
     {
       exit(31);
     }

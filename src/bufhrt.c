@@ -252,9 +252,9 @@ static inline long nsloop(long cnt)
 int main(int argc, char *argv[])
 {
   struct sockaddr_in serv_addr;
-  int listenfd, connfd, ifd, s, moreinput, optval = 1, verbose, rate,
-                                           bytesperframe, optc, interval, shared, innetbufsize, nrcp,
-                                           outnetbufsize, dsync, tcpnodelay, flag;
+  int listenfd, connfd, ifd, s, moreinput, optval, verbose, rate,
+      bytesperframe, optc, interval, shared, innetbufsize, nrcp,
+      outnetbufsize, dsync, tcpnodelay, flag;
   long blen, hlen, ilen, olen, outpersec, loopspersec, nsec, count, wnext,
       badreads, badreadbytes, badwrites, badwritebytes, lcount,
       dcount, dsyncfreq, fsize, e, a, outtime, outcopies, rambps, ramlps,
@@ -315,6 +315,7 @@ int main(int argc, char *argv[])
   /* defaults */
   flag = 1;
   port = NULL;
+  optval = 1;
   dsync = 0;
   dsyncpersec = 0;
   outfile = NULL;
@@ -516,7 +517,6 @@ int main(int argc, char *argv[])
       exit(23);
     }
     if (tcpnodelay != 0 && setsockopt(ifd, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(int)))
-      ;
     {
       fprintf(stderr, "bufhrt: set TCP_NODELAY failed! \n");
       exit(31);
@@ -654,7 +654,6 @@ int main(int argc, char *argv[])
       exit(30);
     }
     if (tcpnodelay != 0 && setsockopt(listenfd, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(int)))
-      ;
     {
       fprintf(stderr, "bufhrt: set TCP_NODELAY failed! \n");
       exit(31);

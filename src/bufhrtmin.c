@@ -63,9 +63,9 @@ static inline long nsloop(long cnt)
 int main(int argc, char *argv[])
 {
   struct sockaddr_in serv_addr;
-  int listenfd, connfd, ifd, s, moreinput, optval = 1, rate,
-                                           bytesperframe, optc, interval, innetbufsize, nrcp,
-                                           outnetbufsize, tcpnodelay, flag;
+  int listenfd, connfd, ifd, s, moreinput, optval, rate,
+      bytesperframe, optc, interval, innetbufsize, nrcp,
+      outnetbufsize, tcpnodelay, flag;
   long blen, hlen, ilen, olen, outpersec, loopspersec, nsec, count, wnext,
       outcopies, rambps, ramlps,
       ramchunk;
@@ -121,7 +121,7 @@ int main(int argc, char *argv[])
   /* defaults */
   flag = 1;
   port = NULL;
-
+  optval = 1;
   outfile = NULL;
   blen = 65536;
   /* default input is stdin */
@@ -298,11 +298,9 @@ int main(int argc, char *argv[])
     if (innetbufsize != 0 &&
         setsockopt(ifd, SOL_SOCKET, SO_RCVBUF, (void *)&innetbufsize, sizeof(int)) < 0)
     {
-
       exit(23);
     }
     if (tcpnodelay != 0 && setsockopt(ifd, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(int)))
-      ;
     {
       exit(31);
     }
@@ -400,7 +398,6 @@ int main(int argc, char *argv[])
       exit(30);
     }
     if (tcpnodelay != 0 && setsockopt(listenfd, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(int)))
-      ;
     {
       exit(31);
     }
