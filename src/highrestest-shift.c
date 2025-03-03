@@ -56,8 +56,6 @@ long long get_tsc_freq(void)
     fprintf(stderr, "Perf system doesn't support user time\n");
     return 1;
   }
-  // printf("TSC-Mult: %u \n", pc->time_mult);
-  // printf("TSC-Shift: %u \n", pc->time_shift);
   close(fd);
 
   __uint128_t x = 1000000000ull;
@@ -157,7 +155,7 @@ int main(int argc, char *argv[])
     min = 0;
     max = 0;
     dev = 0;
-    printf("Interval: %ld \n", dint);
+    printf("Diff resolution: %ld ns\n", dint);
     clock_gettime(MYCLOCK, &res);
     last = res;
 
@@ -224,8 +222,8 @@ int main(int argc, char *argv[])
     min = 0;
     max = 0;
     dev = 0;
-    printf("Interval: %ld \n", dint);
-    printf("Shiftdelay: %d \n", shift);
+    printf("Diff resolution: %ld ns\n", dint);
+    printf("Shiftdelay: %d ns\n", shift);
     for (i = 0; i < 21; count[i] = 0, i++)
       ;
 
