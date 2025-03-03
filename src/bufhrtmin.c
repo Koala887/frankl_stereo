@@ -105,7 +105,7 @@ int main(int argc, char *argv[])
       {"extra-bytes-per-second", required_argument, 0, 'e'},
       {"in-net-buffer-size", required_argument, 0, 'K'},
       {"out-net-buffer-size", required_argument, 0, 'L'},
-        {"tcp-nodelay", no_argument, 0, 'T' },
+      {"tcp-nodelay", no_argument, 0, 'T' },
       {"overwrite", required_argument, 0, 'O'}, /* not used, ignored */
       {"interval", no_argument, 0, 'I'},
       {"verbose", no_argument, 0, 'v'},
@@ -146,7 +146,7 @@ int main(int argc, char *argv[])
   nrcp = 0;
   innetbufsize = 0;
   outnetbufsize = 0;
-    tcpnodelay = 0;
+  tcpnodelay = 0;
   while ((optc = getopt_long(argc, argv, "p:o:b:i:D:n:m:X:Y:s:f:F:R:c:H:P:e:x:TvVIhd",
                              longoptions, &optind)) != -1)
   {
@@ -249,7 +249,6 @@ int main(int argc, char *argv[])
     case 'T':
       tcpnodelay = 1;
       break;
-
     case 'I':
       interval = 1;
       break;
@@ -300,11 +299,10 @@ int main(int argc, char *argv[])
             setsockopt(ifd, SOL_SOCKET, SO_RCVBUF, (void*)&innetbufsize, sizeof(int)) < 0) {
 
                 exit(23);
-        }
-        if (tcpnodelay != 0 && setsockopt(ifd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int));    
-        {  
-
-            exit(31);
+    }
+    if (tcpnodelay != 0 && setsockopt(ifd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)));    
+    {  
+        exit(31);
     }
   }
   if (ramlps != 0 && rambps != 0)
@@ -399,7 +397,7 @@ int main(int argc, char *argv[])
     {
       exit(30);
     }
-    if (tcpnodelay != 0 && setsockopt(listenfd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int));    
+    if (tcpnodelay != 0 && setsockopt(listenfd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)));    
     {  
         exit(31);
     }

@@ -22,6 +22,7 @@ http://www.gnu.org/licenses/gpl.txt for license details.
 #include "cprefresh.h"
 #include <linux/prctl.h>
 #include <sys/prctl.h>
+#include <netinet/tcp.h>
 /* help page */
 /* vim hint to remove resp. add quotes:
       s/^"\(.*\)\\n"$/\1/
@@ -322,7 +323,7 @@ int main(int argc, char *argv[])
         exit(23);
       }
     }
-    if (tcpnodelay != 0 && setsockopt(sfd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int));    
+    if (tcpnodelay != 0 && setsockopt(sfd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)));    
     {  
         fprintf(stderr, "playhrt: set TCP_NODELAY failed! \n");
         exit(31);

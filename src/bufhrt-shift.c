@@ -321,7 +321,7 @@ int main(int argc, char *argv[])
     struct sockaddr_in serv_addr;
     int listenfd, connfd, ifd, s, moreinput, optval=1, verbose, rate,
         bytesperframe, optc, interval, shared, innetbufsize, nrcp,
-        outnetbufsize, dsync;
+        outnetbufsize, dsync, tcpnodelay, flag;
     long blen, hlen, ilen, olen, outpersec, loopspersec, nsec, count, wnext,
          badreads, badreadbytes, badwrites, badwritebytes, lcount, 
          dcount, dsyncfreq, fsize, e, a, outtime, outcopies, rambps, ramlps, 
@@ -366,6 +366,7 @@ int main(int argc, char *argv[])
         {"extra-bytes-per-second", required_argument, 0, 'e' },
         {"in-net-buffer-size", required_argument, 0, 'K' },
         {"out-net-buffer-size", required_argument, 0, 'L' },
+        {"tcp-nodelay", no_argument, 0, 'T' },
         {"overwrite", required_argument, 0, 'O' }, /* not used, ignored */
         {"interval", no_argument, 0, 'I' },
         {"verbose", no_argument, 0, 'v' },
@@ -409,9 +410,10 @@ int main(int argc, char *argv[])
     nrcp = 0;
     innetbufsize = 0;
     outnetbufsize = 0;
-    shift = 95000; 
+    shift = 100000; 
     verbose = 0;
-    while ((optc = getopt_long(argc, argv, "p:o:b:i:D:n:m:X:Y:s:f:F:R:c:H:P:e:x:vVIhd",
+    tcpnodelay = 0;    
+    while ((optc = getopt_long(argc, argv, "p:o:b:i:D:n:m:X:Y:s:f:F:R:c:H:P:e:x:TvVIhd",
             longoptions, &optind)) != -1) {
         switch (optc) {
         case 'p':
@@ -500,6 +502,9 @@ int main(int argc, char *argv[])
           shift = atoi(optarg);
         case 'O':
           break;   /* ignored */
+        case 'T':
+          tcpnodelay = 1;
+          break;
         case 'I':
           interval = 1;
           break;
@@ -551,6 +556,11 @@ int main(int argc, char *argv[])
                 fprintf(stderr, "bufhrt: Cannot set buffer size for network socket to %d.\n",
                         innetbufsize);
                 exit(23);
+        }
+        if (tcpnodelay != 0 && setsockopt(ifd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)));    
+        {  
+            fprintf(stderr, "bufhrt: set TCP_NODELAY failed! \n");
+            exit(31);
         }
     }
     if (ramlps != 0 && rambps != 0) {
@@ -666,6 +676,11 @@ int main(int argc, char *argv[])
             fprintf(stderr, "bufhrt: Cannot set outgoing network buffer to %d.\n",
                     outnetbufsize);
             exit(30);
+        }
+        if (tcpnodelay != 0 && setsockopt(listenfd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)));    
+        {  
+            fprintf(stderr, "bufhrt: set TCP_NODELAY failed! \n");
+            exit(31);
         }
         memset(&serv_addr, '0', sizeof(serv_addr));
         serv_addr.sin_family = AF_INET;

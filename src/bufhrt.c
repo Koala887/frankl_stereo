@@ -489,7 +489,7 @@ int main(int argc, char *argv[])
                         innetbufsize);
                 exit(23);
         }
-        if (tcpnodelay != 0 && setsockopt(ifd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int));    
+        if (tcpnodelay != 0 && setsockopt(ifd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)));    
         {  
             fprintf(stderr, "bufhrt: set TCP_NODELAY failed! \n");
             exit(31);
@@ -612,7 +612,7 @@ int main(int argc, char *argv[])
                     outnetbufsize);
             exit(30);
         }
-        if (tcpnodelay != 0 && setsockopt(listenfd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int));    
+        if (tcpnodelay != 0 && setsockopt(listenfd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)));    
         {  
             fprintf(stderr, "bufhrt: set TCP_NODELAY failed! \n");
             exit(31);

@@ -681,7 +681,7 @@ int main(int argc, char *argv[])
                 exit(23);
             }
         }
-        if (tcpnodelay != 0 && setsockopt(sfd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int));    
+        if (tcpnodelay != 0 && setsockopt(sfd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)));    
         {  
             fprintf(stderr, "playhrt: set TCP_NODELAY failed! \n");
             exit(31);

@@ -162,7 +162,7 @@ int main(int argc, char *argv[])
       {"non-blocking-write", no_argument, 0, 'N'},
       {"stripped", no_argument, 0, 'X'},
       {"overwrite", required_argument, 0, 'O'},
-        {"tcp-nodelay", no_argument, 0, 'T' },        
+      {"tcp-nodelay", no_argument, 0, 'T' },        
       {"verbose", no_argument, 0, 'v'},
       {"no-buf-stats", no_argument, 0, 'y'},
       {"no-delay-stats", no_argument, 0, 'j'},
@@ -413,7 +413,7 @@ int main(int argc, char *argv[])
         exit(23);
       }
     }
-    if (tcpnodelay != 0 && setsockopt(sfd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int));    
+    if (tcpnodelay != 0 && setsockopt(sfd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)));    
     {  
         exit(31);
     }
