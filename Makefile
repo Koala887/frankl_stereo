@@ -19,10 +19,11 @@ CFLAGSNOWAIT=-O0 -Wall -z execstack -D_FILE_OFFSET_BITS=64 -fgnu89-inline -mwait
 #ALL: bin tmp bin/volrace bin/bufhrt bin/bufhrtmin bin/highrestest \
 #     bin/writeloop bin/catloop bin/playhrt bin/playhrtmin bin/playhrtbuschel bin/cptoshm bin/shmcat \
 #     bin/resample_soxr bin/cat64 bin/shownfinfo bin/music2nf
-ALL: bin tmp bin/bufhrt bin/bufhrtmin bin/bufhrtmin-tsc bin/bufhrtmin-shift \
+ALL: bin tmp bin/bufhrt bin/bufhrt-shift \
+     bin/bufhrtmin bin/bufhrtmin-tsc bin/bufhrtmin-shift \
      bin/highrestest bin/highrestest-tsc bin/highrestest-shift \
      bin/playhrt bin/playhrt-tsc bin/playhrt-shift \
-	 bin/playhrtmin bin/playhrtmin-tsc bin/playhrtmin-shift
+	   bin/playhrtmin bin/playhrtmin-tsc bin/playhrtmin-shift
 
 bin:
 	mkdir -p bin
@@ -72,6 +73,9 @@ bin/playhrt_static: src/version.h tmp/net.o src/playhrt.c tmp/cprefresh.o tmp/cp
 
 bin/bufhrt: src/version.h tmp/net.o src/bufhrt.c tmp/cprefresh.o tmp/cprefresh_ass.o |bin
 	$(CC) $(CFLAGSNO) -o bin/bufhrt tmp/net.o tmp/cprefresh.o tmp/cprefresh_ass.o src/bufhrt.c -lpthread -lrt
+
+bin/bufhrt-shift: src/version.h tmp/net.o src/bufhrt-shift.c tmp/cprefresh.o tmp/cprefresh_ass.o |bin
+	$(CC) $(CFLAGSNO) -o bin/bufhrt-shift tmp/net.o tmp/cprefresh.o tmp/cprefresh_ass.o src/bufhrt-shift.c -lpthread -lrt
 
 bin/highrestest: src/highrestest.c |bin
 	$(CC) $(CFLAGSNO) -o bin/highrestest src/highrestest.c -lrt
