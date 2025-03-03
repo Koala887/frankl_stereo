@@ -30,6 +30,8 @@ http://www.gnu.org/licenses/gpl.txt for license details.
 #include <asm/unistd.h>
 #include <inttypes.h>
 #include <fcntl.h>
+#include <netinet/tcp.h>
+
 void usage()
 {
   fprintf(stderr,
@@ -127,7 +129,7 @@ long ns_to_ticks(long ns)
 int main(int argc, char *argv[])
 {
   int sfd, ifd, s, nrchannels, startcount,
-      stripped, innetbufsize, nrcp, slowcp, k, i;
+      stripped, innetbufsize, nrcp, slowcp, k, i, tcpnodelay, flag;
   long blen, ilen, olen, extra, loopspersec, sleep,
       nsec, csec, shift;
 
@@ -171,6 +173,7 @@ int main(int argc, char *argv[])
       {"non-blocking-write", no_argument, 0, 'N'},
       {"stripped", no_argument, 0, 'X'},
       {"overwrite", required_argument, 0, 'O'},
+      {"tcp-nodelay", no_argument, 0, 'T' },   
       {"verbose", no_argument, 0, 'v'},
       {"no-buf-stats", no_argument, 0, 'y'},
       {"no-delay-stats", no_argument, 0, 'j'},
@@ -184,6 +187,7 @@ int main(int argc, char *argv[])
     exit(0);
   }
   /* defaults */
+  flag = 1;
   host = NULL;
   port = NULL;
   blen = 65536;
@@ -209,7 +213,8 @@ int main(int argc, char *argv[])
   innetbufsize = 0;
   shift = 1000;
   stripped = 1;
-  while ((optc = getopt_long(argc, argv, "r:p:Sb:D:i:n:s:f:k:Mc:P:d:R:Ce:x:m:K:o:NXO:vyjVh",
+  tcpnodelay = 0;    
+  while ((optc = getopt_long(argc, argv, "r:p:Sb:D:i:n:s:f:k:Mc:P:d:R:Ce:x:m:K:o:NXO:TvyjVh",
                              longoptions, &optind)) != -1)
   {
     switch (optc)
@@ -313,6 +318,9 @@ int main(int argc, char *argv[])
       break;
     case 'O':
       break;
+    case 'T':
+      tcpnodelay = 1;
+      break;   
     case 'v':
       break;
     case 'X':
@@ -436,6 +444,11 @@ int main(int argc, char *argv[])
         exit(23);
       }
     }
+    if (tcpnodelay != 0 && setsockopt(sfd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int));    
+    {  
+        fprintf(stderr, "playhrt: set TCP_NODELAY failed! \n");
+        exit(31);
+    }  
   }
 
   /**********************************************************************/

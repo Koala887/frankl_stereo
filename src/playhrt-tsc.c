@@ -29,6 +29,7 @@ http://www.gnu.org/licenses/gpl.txt for license details.
 #include <asm/unistd.h>
 #include <inttypes.h>
 #include <fcntl.h>
+#include <netinet/tcp.h>
 
 /* help page */
 /* vim hint to remove resp. add quotes:
@@ -406,7 +407,7 @@ static void ns2timespec(struct timespec *ts, unsigned long ns)
 int main(int argc, char *argv[])
 {
   int sfd, ifd, s, i, moreinput, err, verbose, nrchannels, startcount, sumavg,
-      stripped, innetbufsize, dobufstats, countdelay, maxbad, nrcp, slowcp, k;
+      stripped, innetbufsize, dobufstats, countdelay, maxbad, nrcp, slowcp, k, tcpnodelay, flag;
   long blen, hlen, ilen, olen, extra, loopspersec, nrdelays, sleep,
       nsec, csec, wnext, badloops, badreads, readmissing, avgav, checkav, shift;
   long long count, icount, ocount, badframes, start_ticks,
@@ -453,6 +454,7 @@ int main(int argc, char *argv[])
       {"non-blocking-write", no_argument, 0, 'N'},
       {"stripped", no_argument, 0, 'X'},
       {"overwrite", required_argument, 0, 'O'},
+      {"tcp-nodelay", no_argument, 0, 'T' },        
       {"verbose", no_argument, 0, 'v'},
       {"no-buf-stats", no_argument, 0, 'y'},
       {"no-delay-stats", no_argument, 0, 'j'},
@@ -466,6 +468,7 @@ int main(int argc, char *argv[])
     exit(0);
   }
   /* defaults */
+  flag = 1;
   host = NULL;
   port = NULL;
   blen = 65536;
@@ -496,7 +499,8 @@ int main(int argc, char *argv[])
   stripped = 0;
   dobufstats = 1;
   countdelay = 1;
-  while ((optc = getopt_long(argc, argv, "r:p:Sb:D:i:n:s:f:k:Mc:P:d:R:Ce:x:m:K:o:NXO:vyjVh",
+  tcpnodelay = 0;    
+  while ((optc = getopt_long(argc, argv, "r:p:Sb:D:i:n:s:f:k:Mc:P:d:R:Ce:x:m:K:o:NXO:TvyjVh",
                              longoptions, &optind)) != -1)
   {
     switch (optc)
@@ -602,6 +606,9 @@ int main(int argc, char *argv[])
       break;
     case 'O':
       break;
+    case 'T':
+      tcpnodelay = 1;
+      break;          
     case 'v':
       verbose += 1;
       break;
@@ -753,8 +760,12 @@ int main(int argc, char *argv[])
         exit(23);
       }
     }
+    if (tcpnodelay != 0 && setsockopt(sfd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int));    
+    {  
+        fprintf(stderr, "playhrt: set TCP_NODELAY failed! \n");
+        exit(31);
+    }
   }
-
   /**********************************************************************/
   /* setup sound device                                                 */
   /**********************************************************************/

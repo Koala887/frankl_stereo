@@ -27,6 +27,7 @@ http://www.gnu.org/licenses/gpl.txt for license details.
 #include <linux/perf_event.h>
 #include <asm/unistd.h>
 #include <inttypes.h>
+#include <netinet/tcp.h>
 
 void usage()
 {
@@ -117,7 +118,7 @@ static inline long nsloop(long cnt)
 int main(int argc, char *argv[])
 {
   int sfd, s, verbose, nrchannels, startcount,
-        stripped, innetbufsize, nrcp, slowcp, k, i;
+        stripped, innetbufsize, nrcp, slowcp, k, i, tcpnodelay, flag;
   long blen, ilen, olen, extra, loopspersec, sleep,
       nsec, csec, shift;
   long long count;
@@ -161,6 +162,7 @@ int main(int argc, char *argv[])
       {"non-blocking-write", no_argument, 0, 'N'},
       {"stripped", no_argument, 0, 'X'},
       {"overwrite", required_argument, 0, 'O'},
+        {"tcp-nodelay", no_argument, 0, 'T' },        
       {"verbose", no_argument, 0, 'v'},
       {"no-buf-stats", no_argument, 0, 'y'},
       {"no-delay-stats", no_argument, 0, 'j'},
@@ -180,6 +182,7 @@ int main(int argc, char *argv[])
     exit(0);
   }
   /* defaults */
+  flag = 1;
   host = NULL;
   port = NULL;
   blen = 65536;
@@ -206,8 +209,9 @@ int main(int argc, char *argv[])
   verbose = 0;
   stripped = 1;
 
-  shift = 95000;
-  while ((optc = getopt_long(argc, argv, "r:p:Sb:D:i:n:s:f:k:Mc:P:d:R:Ce:m:K:o:NXO:x:vyjVh",
+  shift = 100000;
+  tcpnodelay = 0;    
+  while ((optc = getopt_long(argc, argv, "r:p:Sb:D:i:n:s:f:k:Mc:P:d:R:Ce:m:K:o:NXO:x:TvyjVh",
                              longoptions, &optind)) != -1)
   {
     switch (optc)
@@ -311,6 +315,9 @@ int main(int argc, char *argv[])
       break;      
     case 'O':
       break;
+    case 'T':
+      tcpnodelay = 1;
+      break;          
     case 'v':
       verbose += 1;
       break;
@@ -406,8 +413,11 @@ int main(int argc, char *argv[])
         exit(23);
       }
     }
+    if (tcpnodelay != 0 && setsockopt(sfd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int));    
+    {  
+        exit(31);
+    }
   }
-
   /**********************************************************************/
   /* setup sound device                                                 */
   /**********************************************************************/

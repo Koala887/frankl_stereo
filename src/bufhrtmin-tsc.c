@@ -32,6 +32,7 @@ http://www.gnu.org/licenses/gpl.txt for license details.
 #include <linux/perf_event.h>
 #include <asm/unistd.h>
 #include <inttypes.h>
+#include <netinet/tcp.h>
 
 #define TBUF 134217728 /* 2^27 */
 
@@ -183,6 +184,7 @@ int main(int argc, char *argv[])
     exit(0);
   }
   /* defaults */
+  flag = 1;
   port = NULL;
   outfile = NULL;
   blen = 65536;
